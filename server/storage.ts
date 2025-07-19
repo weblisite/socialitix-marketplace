@@ -12,7 +12,14 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is required");
 }
 
-const client = postgres(process.env.DATABASE_URL);
+// Add SSL configuration for Supabase
+const client = postgres(process.env.DATABASE_URL, {
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: 10,
+  transform: {
+    undefined: null,
+  },
+});
 const db = drizzle(client);
 
 export interface IStorage {
