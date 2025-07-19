@@ -2,9 +2,12 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { 
   users, services, transactions, withdrawals, cartItems,
+  actionAssignments, moderationQueue, emailTemplates, emailLogs, socialMediaAccounts, reports,
   type User, type InsertUser, type Service, type InsertService,
   type Transaction, type InsertTransaction, type Withdrawal, type InsertWithdrawal,
-  type CartItem, type InsertCartItem
+  type CartItem, type InsertCartItem, type ActionAssignment, type InsertActionAssignment,
+  type ModerationQueue, type InsertModerationQueue, type EmailTemplate, type InsertEmailTemplate,
+  type SocialMediaAccount, type InsertSocialMediaAccount, type Report, type InsertReport
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -20,7 +23,7 @@ const client = postgres(process.env.DATABASE_URL, {
     undefined: null,
   },
 });
-const db = drizzle(client);
+export const db = drizzle(client);
 
 export interface IStorage {
   // User methods

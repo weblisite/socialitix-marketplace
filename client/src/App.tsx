@@ -8,6 +8,8 @@ import Landing from "@/pages/landing";
 import BuyerDashboard from "@/pages/buyer-dashboard";
 import ProviderDashboard from "@/pages/provider-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
+import EnhancedAdminDashboard from "@/pages/enhanced-admin-dashboard";
+import Profile from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -16,7 +18,8 @@ function Router() {
       <Route path="/" component={Landing} />
       <Route path="/buyer" component={BuyerDashboard} />
       <Route path="/provider" component={ProviderDashboard} />
-      <Route path="/admin" component={AdminDashboard} />
+      <Route path="/admin" component={EnhancedAdminDashboard} />
+      <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>
   );

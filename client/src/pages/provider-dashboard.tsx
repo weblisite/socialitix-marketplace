@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth.tsx";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { calculateWithdrawalFee } from "@/lib/paystack";
+import AssignmentCard from "@/components/assignment-card";
 
 export default function ProviderDashboard() {
   const { user, logout } = useAuth();
@@ -20,6 +22,7 @@ export default function ProviderDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
+  const [assignmentFilter, setAssignmentFilter] = useState("all");
 
   // Redirect if not provider
   if (user?.role !== 'provider') {
@@ -37,6 +40,10 @@ export default function ProviderDashboard() {
 
   const { data: withdrawals = [] } = useQuery({
     queryKey: ['/api/withdrawals'],
+  });
+
+  const { data: assignments = [], refetch: refetchAssignments } = useQuery({
+    queryKey: ['/api/assignments'],
   });
 
   const createServiceMutation = useMutation({

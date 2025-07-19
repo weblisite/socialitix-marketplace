@@ -1,9 +1,19 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertServiceSchema, insertTransactionSchema, insertWithdrawalSchema, insertCartItemSchema } from "@shared/schema";
+import { db } from "./storage";
+import { 
+  insertUserSchema, insertServiceSchema, insertTransactionSchema, insertWithdrawalSchema, insertCartItemSchema,
+  users, moderationQueue, reports
+} from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { sendEmail, initializeEmailTemplates } from './email';
+import { moderateContent, validateCommentText, approveContent, rejectContent } from './moderation';
+import { linkSocialMediaAccount, getUserSocialAccounts } from './social-media';
+import { getProviderAssignments, startAssignment, submitAssignmentProof } from './action-assignments';
+import { upload, processProofImage, validateProofImage } from './file-upload';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -361,6 +371,217 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Webhook processing failed", error });
     }
   });
+
+  // Email and notification routes
+  app.post("/api/email/send", authenticateToken, async (req, res) => {
+    try {
+      const { to, templateName, variables } = req.body;
+      const result = await sendEmail({ to, templateName, variables });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to send email", error: error.message });
+    }
+  });
+
+  // Social media account management
+  app.get("/api/social-accounts", authenticateToken, async (req, res) => {
+    try {
+      const accounts = await getUserSocialAccounts(req.user.id);
+      res.json(accounts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get social accounts", error: error.message });
+    }
+  });
+
+  app.post("/api/social-accounts", authenticateToken, async (req, res) => {
+    try {
+      const { platform, username, accessToken } = req.body;
+      const result = await linkSocialMediaAccount(req.user.id, platform, username, accessToken);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to link account", error: error.message });
+    }
+  });
+
+  // Provider assignments
+  app.get("/api/assignments", authenticateToken, async (req, res) => {
+    try {
+      const { status } = req.query;
+      const assignments = await getProviderAssignments(req.user.id, status as string);
+      res.json(assignments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get assignments", error: error.message });
+    }
+  });
+
+  app.post("/api/assignments/:id/start", authenticateToken, async (req, res) => {
+    try {
+      const result = await startAssignment(parseInt(req.params.id), req.user.id);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to start assignment", error: error.message });
+    }
+  });
+
+  app.post("/api/assignments/:id/submit-proof", authenticateToken, upload.single('proof'), async (req, res) => {
+    try {
+      const assignmentId = parseInt(req.params.id);
+      let proofUrl = '';
+
+      if (req.file) {
+        const validation = validateProofImage(req.file);
+        if (!validation.valid) {
+          return res.status(400).json({ message: "Invalid image", errors: validation.errors });
+        }
+
+        const processResult = await processProofImage(req.file.buffer, req.file.originalname, req.user.id, assignmentId);
+        if (!processResult.success) {
+          return res.status(500).json({ message: "Failed to process image", error: processResult.error });
+        }
+        proofUrl = processResult.url!;
+      }
+
+      const result = await submitAssignmentProof(assignmentId, req.user.id, proofUrl);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to submit proof", error: error.message });
+    }
+  });
+
+  // Content moderation
+  app.post("/api/moderate-content", authenticateToken, async (req, res) => {
+    try {
+      const { content, type } = req.body;
+      const result = moderateContent(content, type);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to moderate content", error: error.message });
+    }
+  });
+
+  app.post("/api/validate-comment", async (req, res) => {
+    try {
+      const { comment } = req.body;
+      const result = validateCommentText(comment);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to validate comment", error: error.message });
+    }
+  });
+
+  // Admin moderation queue
+  app.get("/api/admin/moderation-queue", authenticateToken, async (req, res) => {
+    try {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const queue = await db.select().from(moderationQueue)
+        .where(eq(moderationQueue.status, 'pending'))
+        .orderBy(desc(moderationQueue.createdAt));
+      
+      res.json(queue);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get moderation queue", error: error.message });
+    }
+  });
+
+  app.post("/api/admin/moderate/:id/approve", authenticateToken, async (req, res) => {
+    try {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { reason } = req.body;
+      await approveContent(parseInt(req.params.id), req.user.id, reason);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to approve content", error: error.message });
+    }
+  });
+
+  app.post("/api/admin/moderate/:id/reject", authenticateToken, async (req, res) => {
+    try {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { reason } = req.body;
+      await rejectContent(parseInt(req.params.id), req.user.id, reason);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to reject content", error: error.message });
+    }
+  });
+
+  // Admin user management
+  app.get("/api/admin/users", authenticateToken, async (req, res) => {
+    try {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const allUsers = await db.select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        role: users.role,
+        balance: users.balance,
+        createdAt: users.createdAt
+      }).from(users)
+        .orderBy(desc(users.createdAt));
+      
+      res.json(allUsers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get users", error: error.message });
+    }
+  });
+
+  app.post("/api/admin/users/:id/suspend", authenticateToken, async (req, res) => {
+    try {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // In a real implementation, you'd add a 'suspended' field to users table
+      res.json({ success: true, message: "User suspension functionality would be implemented here" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to suspend user", error: error.message });
+    }
+  });
+
+  // Reports system
+  app.post("/api/reports", authenticateToken, async (req, res) => {
+    try {
+      const reportData = {
+        reporterId: req.user.id,
+        ...req.body
+      };
+      
+      const report = await db.insert(reports).values(reportData).returning();
+      res.json(report[0]);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create report", error: error.message });
+    }
+  });
+
+  app.get("/api/admin/reports", authenticateToken, async (req, res) => {
+    try {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const allReports = await db.select().from(reports)
+        .orderBy(desc(reports.createdAt));
+      
+      res.json(allReports);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get reports", error: error.message });
+    }
+  });
+
+  // Initialize email templates on server start
+  initializeEmailTemplates().catch(console.error);
 
   const httpServer = createServer(app);
   return httpServer;
