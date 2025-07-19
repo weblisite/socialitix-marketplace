@@ -94,35 +94,56 @@ export default function BuyerDashboard() {
 
   const handleCheckout = async () => {
     try {
+      if (cartItems.length === 0) {
+        toast({ title: "Cart is empty", description: "Add items to cart before checkout", variant: "destructive" });
+        return;
+      }
+
+      const totalAmount = calculateTotal();
+      
+      // Initialize payment with backend
+      const initResponse = await apiRequest('POST', '/api/payments/initialize', {
+        cartItems,
+        totalAmount,
+        targetUrl: "https://example.com"
+      });
+      const paymentData = await initResponse.json();
+      
+      // Load Paystack script and process payment
       await loadPaystackScript();
       
-      const total = calculateTotal() * 100; // Convert to kobo
-      
       initializePayment({
-        key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_example',
+        key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_d74e915c07ff292b5e7d75d8c0ee8061fb0cc6d8',
         email: user!.email,
-        amount: total,
+        amount: paymentData.amount,
+        reference: paymentData.reference,
+        metadata: {
+          transactionId: paymentData.transactionId,
+          cartItems: JSON.stringify(cartItems)
+        },
         callback: async (response) => {
-          // Process each cart item as a transaction
-          for (const item of cartItems) {
-            await checkoutMutation.mutateAsync({
-              providerId: item.service?.providerId || 1,
-              serviceId: item.serviceId,
-              quantity: item.quantity,
-              totalCost: (item.quantity * 5).toString(),
-              providerEarnings: (item.quantity * 2).toString(),
-              commentText: item.commentText,
-              targetUrl: item.targetUrl,
-              paymentId: response.reference,
+          try {
+            // Verify payment with backend
+            await apiRequest('POST', '/api/payments/verify', {
+              reference: response.reference,
+              transactionId: paymentData.transactionId
             });
+            
+            queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+            toast({ title: "Payment successful!", description: "Your order has been placed." });
+            setActiveTab('history');
+          } catch (error) {
+            toast({ title: "Payment verification failed", description: "Please contact support", variant: "destructive" });
           }
         },
         onClose: () => {
-          toast({ title: "Payment cancelled", variant: "destructive" });
+          toast({ title: "Payment cancelled", description: "You can try again anytime" });
         },
       });
     } catch (error) {
-      toast({ title: "Payment failed", description: "Please try again", variant: "destructive" });
+      console.error('Checkout error:', error);
+      toast({ title: "Checkout failed", description: "Please try again", variant: "destructive" });
     }
   };
 

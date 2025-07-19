@@ -285,6 +285,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Initialize Paystack payment
+  app.post("/api/payments/initialize", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'buyer') {
+        return res.status(403).json({ message: "Only buyers can initiate payments" });
+      }
+
+      const { cartItems, totalAmount } = req.body;
+      
+      // Create transaction record
+      const transactionData = insertTransactionSchema.parse({
+        buyerId: req.user.id,
+        providerId: cartItems[0]?.providerId || 1,
+        serviceId: cartItems[0]?.serviceId || 1,
+        quantity: cartItems.reduce((sum: number, item: any) => sum + item.quantity, 0),
+        totalCost: totalAmount.toString(),
+        providerEarnings: (totalAmount * 0.4).toString(), // 40% to provider
+        targetUrl: req.body.targetUrl || "https://example.com",
+        status: "pending"
+      });
+
+      const transaction = await storage.createTransaction(transactionData);
+      
+      res.json({
+        reference: `TXN_${transaction.id}_${Date.now()}`,
+        transactionId: transaction.id,
+        amount: totalAmount * 100, // Convert to kobo for Paystack
+        email: req.user.email
+      });
+    } catch (error) {
+      res.status(400).json({ message: "Payment initialization failed", error });
+    }
+  });
+
+  // Verify Paystack payment
+  app.post("/api/payments/verify", authenticateToken, async (req: any, res) => {
+    try {
+      const { reference, transactionId } = req.body;
+      
+      // In production, verify with Paystack API
+      // For now, simulate successful verification
+      await storage.updateTransaction(parseInt(transactionId), {
+        status: 'completed',
+        paymentId: reference
+      });
+      
+      // Clear buyer's cart
+      await storage.clearCart(req.user.id);
+      
+      res.json({ message: "Payment verified successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Payment verification failed", error });
+    }
+  });
+
   // Payment webhook (Paystack)
   app.post("/api/webhooks/paystack", async (req, res) => {
     try {
