@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/lib/auth.tsx";
 import Landing from "@/pages/landing";
+import ModernLanding from "@/pages/modern-landing";
 import BuyerDashboard from "@/pages/buyer-dashboard";
 import ProviderDashboard from "@/pages/provider-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
@@ -15,7 +16,7 @@ import NotFound from "@/pages/not-found";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Landing} />
+      <Route path="/" component={ModernLanding} />
       <Route path="/buyer" component={BuyerDashboard} />
       <Route path="/provider" component={ProviderDashboard} />
       <Route path="/admin" component={EnhancedAdminDashboard} />
