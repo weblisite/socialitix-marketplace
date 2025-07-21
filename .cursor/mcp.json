@@ -25,6 +25,13 @@
           "47b7efab-447c-4ff3-8696-e0350047b65c"
         ],
         "env": {}
+      },
+      "render": {
+        "command": "npx",
+        "args": ["-y", "@render/mcp-server"],
+        "env": {
+          "RENDER_API_KEY": "rnd_iTY9Hw3K2wOFSs54xGBJASjhI5nk"
+        }
       }
     }
   }
