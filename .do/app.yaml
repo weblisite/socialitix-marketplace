@@ -1,0 +1,33 @@
+name: socialitix-marketplace
+services:
+  - name: web
+    source_dir: /
+    github:
+      repo: weblisite/socialitix-marketplace
+      branch: main
+    run_command: npm start
+    build_command: npm ci && npm run build
+    environment_slug: node-js
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    envs:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${SUPABASE_URL}
+      - key: SUPABASE_ANON_KEY
+        scope: RUN_AND_BUILD_TIME
+        value: ${SUPABASE_ANON_KEY}
+      - key: INTASEND_API_PUBLISHABLE_KEY
+        scope: RUN_AND_BUILD_TIME
+        value: ${INTASEND_API_PUBLISHABLE_KEY}
+      - key: INTASEND_API_SECRET_KEY
+        scope: RUN_AND_BUILD_TIME
+        value: ${INTASEND_API_SECRET_KEY}
+      - key: BASE_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${BASE_URL}
+      - key: FRONTEND_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${FRONTEND_URL} 

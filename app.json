@@ -1,0 +1,48 @@
+{
+  "name": "socialitix-marketplace",
+  "description": "A full-stack social media engagement marketplace with IntaSend payments",
+  "repository": "https://github.com/weblisite/socialitix-marketplace",
+  "logo": "https://node-js-sample.herokuapp.com/node.png",
+  "keywords": ["node", "express", "react", "typescript", "supabase", "intasend"],
+  "env": {
+    "NODE_ENV": {
+      "description": "Environment",
+      "value": "production"
+    },
+    "SUPABASE_URL": {
+      "description": "Supabase URL",
+      "required": true
+    },
+    "SUPABASE_ANON_KEY": {
+      "description": "Supabase Anonymous Key",
+      "required": true
+    },
+    "INTASEND_API_PUBLISHABLE_KEY": {
+      "description": "IntaSend Publishable Key",
+      "required": true
+    },
+    "INTASEND_API_SECRET_KEY": {
+      "description": "IntaSend Secret Key",
+      "required": true
+    },
+    "BASE_URL": {
+      "description": "Base URL for the application",
+      "required": true
+    },
+    "FRONTEND_URL": {
+      "description": "Frontend URL for CORS",
+      "required": true
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  }
+} 
