@@ -3,7 +3,7 @@
   "outputDirectory": "dist/public",
   "framework": "vite",
   "functions": {
-    "server/routes.ts": {
+    "api/index.ts": {
       "runtime": "nodejs18.x"
     }
   },

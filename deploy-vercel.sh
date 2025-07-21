@@ -34,22 +34,24 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
-# Check if Vercel CLI is installed
+# Check if Vercel CLI is available via npx
 print_status "Checking Vercel CLI..."
-if ! command -v vercel &> /dev/null; then
-    print_warning "Vercel CLI not found. Installing..."
-    npm install -g vercel
+if ! npx vercel --version &>/dev/null; then
+    print_error "Vercel CLI not available. Please install it manually: npm install -g vercel"
+    exit 1
 fi
+
+print_success "Vercel CLI found via npx"
 
 # Check if user is logged in
 print_status "Checking Vercel login status..."
-if ! vercel whoami &>/dev/null; then
+if ! npx vercel whoami &>/dev/null; then
     print_warning "Not logged in to Vercel. Please complete the login process."
-    print_status "Running: vercel login"
-    vercel login
+    print_status "Running: npx vercel login"
+    npx vercel login
     
     # Check if login was successful
-    if ! vercel whoami &>/dev/null; then
+    if ! npx vercel whoami &>/dev/null; then
         print_error "Login failed. Please try again."
         exit 1
     fi
@@ -68,7 +70,7 @@ fi
 
 # Deploy to Vercel
 print_status "Deploying to Vercel..."
-vercel --prod
+npx vercel --prod
 
 if [ $? -eq 0 ]; then
     print_success "Deployment successful!"
@@ -88,13 +90,13 @@ if [ $? -eq 0 ]; then
     echo "- FRONTEND_URL"
     echo ""
     print_status "To set environment variables:"
-    echo "vercel env add SUPABASE_URL"
-    echo "vercel env add SUPABASE_ANON_KEY"
-    echo "vercel env add INTASEND_API_PUBLISHABLE_KEY"
-    echo "vercel env add INTASEND_API_SECRET_KEY"
-    echo "vercel env add NODE_ENV"
-    echo "vercel env add BASE_URL"
-    echo "vercel env add FRONTEND_URL"
+    echo "npx vercel env add SUPABASE_URL"
+    echo "npx vercel env add SUPABASE_ANON_KEY"
+    echo "npx vercel env add INTASEND_API_PUBLISHABLE_KEY"
+    echo "npx vercel env add INTASEND_API_SECRET_KEY"
+    echo "npx vercel env add NODE_ENV"
+    echo "npx vercel env add BASE_URL"
+    echo "npx vercel env add FRONTEND_URL"
 else
     print_error "Deployment failed! Check the errors above."
     exit 1
