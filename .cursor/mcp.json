@@ -16,6 +16,15 @@
         "args": [
           "@browsermcp/mcp@latest"
         ]
+      },
+      "Railway": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@jasontanswe/railway-mcp",
+          "47b7efab-447c-4ff3-8696-e0350047b65c"
+        ],
+        "env": {}
       }
     }
   }
