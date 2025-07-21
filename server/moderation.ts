@@ -1,6 +1,5 @@
-import { db } from './storage';
-import { moderationQueue, type InsertModerationQueue } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { supabase } from './supabase';
+import { type InsertModerationQueue } from '@shared/schema';
 
 // Simple profanity filter implementation
 const badWords = [
@@ -107,37 +106,56 @@ export async function queueForModeration(
   contentId: number,
   content: string
 ): Promise<number> {
-  const moderationData: InsertModerationQueue = {
-    contentType,
-    contentId,
+  const moderationData = {
+    content_type: contentType,
+    content_id: contentId,
     content,
     status: 'pending'
   };
 
-  const result = await db.insert(moderationQueue).values(moderationData).returning();
-  return result[0].id;
+  const { data, error } = await supabase
+    .from('moderation_queue')
+    .insert([moderationData])
+    .select()
+    .single();
+  
+  if (error) {
+    throw new Error(`Failed to queue for moderation: ${error.message}`);
+  }
+  
+  return data.id;
 }
 
 export async function approveContent(moderationId: number, moderatorId: number, reason?: string): Promise<void> {
-  await db.update(moderationQueue)
-    .set({
+  const { error } = await supabase
+    .from('moderation_queue')
+    .update({
       status: 'approved',
-      moderatorId,
+      moderator_id: moderatorId,
       reason,
-      moderatedAt: new Date()
+      moderated_at: new Date().toISOString()
     })
-    .where(eq(moderationQueue.id, moderationId));
+    .eq('id', moderationId);
+  
+  if (error) {
+    throw new Error(`Failed to approve content: ${error.message}`);
+  }
 }
 
 export async function rejectContent(moderationId: number, moderatorId: number, reason: string): Promise<void> {
-  await db.update(moderationQueue)
-    .set({
+  const { error } = await supabase
+    .from('moderation_queue')
+    .update({
       status: 'rejected',
-      moderatorId,
+      moderator_id: moderatorId,
       reason,
-      moderatedAt: new Date()
+      moderated_at: new Date().toISOString()
     })
-    .where(eq(moderationQueue.id, moderationId));
+    .eq('id', moderationId);
+  
+  if (error) {
+    throw new Error(`Failed to reject content: ${error.message}`);
+  }
 }
 
 // Auto-moderate content based on severity
@@ -146,7 +164,7 @@ export async function autoModerate(
   contentId: number,
   content: string
 ): Promise<{ approved: boolean; needsReview: boolean; moderationId?: number }> {
-  const moderation = moderateContent(content, contentType);
+  const moderation = moderateContent(content, contentType === 'user_report' ? 'general' : contentType);
 
   if (moderation.isClean) {
     return { approved: true, needsReview: false };

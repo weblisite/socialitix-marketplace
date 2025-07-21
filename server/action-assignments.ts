@@ -1,6 +1,5 @@
-import { db } from './storage';
-import { actionAssignments, transactions, users, services, type InsertActionAssignment } from '@shared/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { supabase } from './supabase';
+import { type InsertActionAssignment } from '@shared/schema';
 import { sendEmail } from './email';
 import { getActionInstructions } from './social-media';
 
@@ -8,40 +7,30 @@ import { getActionInstructions } from './social-media';
 export async function createActionAssignments(transactionId: number): Promise<void> {
   try {
     // Get transaction details
-    const transaction = await db.select({
-      id: transactions.id,
-      buyerId: transactions.buyerId,
-      providerId: transactions.providerId,
-      serviceId: transactions.serviceId,
-      quantity: transactions.quantity,
-      commentText: transactions.commentText,
-      targetUrl: transactions.targetUrl,
-      totalCost: transactions.totalCost,
-      providerEarnings: transactions.providerEarnings
-    })
-    .from(transactions)
-    .where(eq(transactions.id, transactionId))
-    .limit(1);
+    const { data: transactions, error: transactionError } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('id', transactionId)
+      .limit(1);
 
-    if (!transaction.length) {
+    if (transactionError || !transactions || transactions.length === 0) {
       throw new Error('Transaction not found');
     }
 
-    const trans = transaction[0];
+    const trans = transactions[0];
 
     // Get service and provider details
-    const serviceDetails = await db.select({
-      type: services.type,
-      platform: services.platform,
-      providerName: users.name,
-      providerEmail: users.email
-    })
-    .from(services)
-    .leftJoin(users, eq(services.providerId, users.id))
-    .where(eq(services.id, trans.serviceId))
-    .limit(1);
+    const { data: serviceDetails, error: serviceError } = await supabase
+      .from('services')
+      .select(`
+        type,
+        platform,
+        users!inner(name, email)
+      `)
+      .eq('id', trans.service_id)
+      .limit(1);
 
-    if (!serviceDetails.length) {
+    if (serviceError || !serviceDetails || serviceDetails.length === 0) {
       throw new Error('Service details not found');
     }
 
@@ -51,37 +40,43 @@ export async function createActionAssignments(transactionId: number): Promise<vo
     const assignments: InsertActionAssignment[] = [];
     for (let i = 0; i < trans.quantity; i++) {
       assignments.push({
-        transactionId: trans.id,
-        providerId: trans.providerId,
-        actionType: service.type,
+        transaction_id: trans.id,
+        provider_id: trans.provider_id,
+        action_type: service.type,
         platform: service.platform,
-        targetUrl: trans.targetUrl || '',
-        commentText: trans.commentText,
+        target_url: trans.target_url || '',
+        comment_text: trans.comment_text,
         status: 'assigned'
       });
     }
 
     // Insert all assignments
-    await db.insert(actionAssignments).values(assignments);
+    const { error: insertError } = await supabase
+      .from('action_assignments')
+      .insert(assignments);
+
+    if (insertError) {
+      throw new Error(`Failed to create assignments: ${insertError.message}`);
+    }
 
     // Send notification email to provider
     const instructions = getActionInstructions(
       service.type,
       service.platform,
-      trans.targetUrl || '',
-      trans.commentText || undefined
+      trans.target_url || '',
+      trans.comment_text || undefined
     );
 
     await sendEmail({
-      to: service.providerEmail || '',
+      to: service.users?.[0]?.email || '',
       templateName: 'action_assignment',
       variables: {
-        providerName: service.providerName || 'Provider',
+        providerName: service.users?.[0]?.name || 'Provider',
         actionType: service.type,
         platform: service.platform,
-        targetUrl: trans.targetUrl || '',
-        commentText: trans.commentText || '',
-        earnings: (parseFloat(trans.providerEarnings || '0')).toFixed(2),
+        targetUrl: trans.target_url || '',
+        commentText: trans.comment_text || '',
+        earnings: (parseFloat(trans.provider_earnings || '0')).toFixed(2),
         quantity: trans.quantity,
         instructions,
         dashboardUrl: `${process.env.BASE_URL || 'http://localhost:5000'}/provider`
@@ -97,48 +92,42 @@ export async function createActionAssignments(transactionId: number): Promise<vo
 
 // Get assignments for a provider
 export async function getProviderAssignments(providerId: number, status?: string) {
-  let query = db.select({
-    id: actionAssignments.id,
-    transactionId: actionAssignments.transactionId,
-    actionType: actionAssignments.actionType,
-    platform: actionAssignments.platform,
-    targetUrl: actionAssignments.targetUrl,
-    commentText: actionAssignments.commentText,
-    status: actionAssignments.status,
-    proofUrl: actionAssignments.proofUrl,
-    assignedAt: actionAssignments.assignedAt,
-    completedAt: actionAssignments.completedAt,
-    earnings: transactions.providerEarnings,
-    buyerName: users.name
-  })
-  .from(actionAssignments)
-  .leftJoin(transactions, eq(actionAssignments.transactionId, transactions.id))
-  .leftJoin(users, eq(transactions.buyerId, users.id))
-  .where(eq(actionAssignments.providerId, providerId));
+  let query = supabase
+    .from('action_assignments')
+    .select(`
+      *,
+      transactions!inner(provider_earnings, buyer_id),
+      users!inner(name)
+    `)
+    .eq('provider_id', providerId);
 
   if (status) {
-    query = query.where(and(
-      eq(actionAssignments.providerId, providerId),
-      eq(actionAssignments.status, status)
-    ));
+    query = query.eq('status', status);
   }
 
-  return await query.orderBy(desc(actionAssignments.assignedAt));
+  const { data, error } = await query.order('assigned_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error getting provider assignments:', error);
+    return [];
+  }
+
+  return data || [];
 }
 
 // Mark assignment as in progress
 export async function startAssignment(assignmentId: number, providerId: number): Promise<{ success: boolean; error?: string }> {
   try {
-    const result = await db.update(actionAssignments)
-      .set({ status: 'in_progress' })
-      .where(and(
-        eq(actionAssignments.id, assignmentId),
-        eq(actionAssignments.providerId, providerId),
-        eq(actionAssignments.status, 'assigned')
-      ))
-      .returning();
+    const { data, error } = await supabase
+      .from('action_assignments')
+      .update({ status: 'in_progress' })
+      .eq('id', assignmentId)
+      .eq('provider_id', providerId)
+      .eq('status', 'assigned')
+      .select()
+      .single();
 
-    if (!result.length) {
+    if (error || !data) {
       return { success: false, error: 'Assignment not found or already started' };
     }
 
@@ -156,57 +145,58 @@ export async function submitAssignmentProof(
   proofType: 'screenshot' | 'manual' = 'screenshot'
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const result = await db.update(actionAssignments)
-      .set({
+    const { data, error } = await supabase
+      .from('action_assignments')
+      .update({
         status: 'completed',
-        proofUrl,
-        proofType,
-        completedAt: new Date()
+        proof_url: proofUrl,
+        proof_type: proofType,
+        completed_at: new Date().toISOString()
       })
-      .where(and(
-        eq(actionAssignments.id, assignmentId),
-        eq(actionAssignments.providerId, providerId),
-        eq(actionAssignments.status, 'in_progress')
-      ))
-      .returning();
+      .eq('id', assignmentId)
+      .eq('provider_id', providerId)
+      .eq('status', 'in_progress')
+      .select()
+      .single();
 
-    if (!result.length) {
+    if (error || !data) {
       return { success: false, error: 'Assignment not found or not in progress' };
     }
 
     // Get assignment details for notification
-    const assignment = await db.select({
-      actionType: actionAssignments.actionType,
-      platform: actionAssignments.platform,
-      targetUrl: actionAssignments.targetUrl,
-      buyerName: users.name,
-      buyerEmail: users.email,
-      providerName: users.name,
-      transactionId: actionAssignments.transactionId
-    })
-    .from(actionAssignments)
-    .leftJoin(transactions, eq(actionAssignments.transactionId, transactions.id))
-    .leftJoin(users, eq(transactions.buyerId, users.id))
-    .where(eq(actionAssignments.id, assignmentId))
-    .limit(1);
+    const { data: assignmentDetails, error: detailsError } = await supabase
+      .from('action_assignments')
+      .select(`
+        action_type,
+        platform,
+        target_url,
+        transaction_id,
+        transactions!inner(buyer_id),
+        users!inner(name, email)
+      `)
+      .eq('id', assignmentId)
+      .limit(1);
 
-    if (assignment.length) {
-      const details = assignment[0];
+    if (assignmentDetails && assignmentDetails.length > 0) {
+      const details = assignmentDetails[0];
       
       // Notify buyer of completion
       await sendEmail({
-        to: details.buyerEmail || '',
+        to: details.users?.[0]?.email || '',
         templateName: 'action_completed',
         variables: {
-          buyerName: details.buyerName || 'Customer',
-          actionType: details.actionType,
+          buyerName: details.users?.[0]?.name || 'Buyer',
+          actionType: details.action_type,
           platform: details.platform,
-          targetUrl: details.targetUrl,
-          providerName: details.providerName || 'Provider',
-          completedAt: new Date().toLocaleDateString(),
+          targetUrl: details.target_url || '',
+          completedAt: new Date().toLocaleString(),
           dashboardUrl: `${process.env.BASE_URL || 'http://localhost:5000'}/buyer`
         },
-        metadata: { assignmentId, transactionId: details.transactionId, type: 'completion_notification' }
+        metadata: { 
+          assignmentId, 
+          transactionId: details.transaction_id,
+          completionType: 'action_completed' 
+        }
       });
     }
 
@@ -216,7 +206,7 @@ export async function submitAssignmentProof(
   }
 }
 
-// Verify assignment completion
+// Verify assignment completion (admin function)
 export async function verifyAssignmentCompletion(
   assignmentId: number,
   adminId: number,
@@ -224,48 +214,73 @@ export async function verifyAssignmentCompletion(
   reason?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const newStatus = approved ? 'verified' : 'failed';
-    const verificationData = {
-      adminId,
-      approved,
-      reason,
-      verifiedAt: new Date().toISOString()
+    const updateData: any = {
+      verified_by: adminId,
+      verified_at: new Date().toISOString(),
+      verification_reason: reason
     };
 
-    const result = await db.update(actionAssignments)
-      .set({
-        status: newStatus,
-        verificationData,
-        verifiedAt: new Date()
-      })
-      .where(and(
-        eq(actionAssignments.id, assignmentId),
-        eq(actionAssignments.status, 'completed')
-      ))
-      .returning();
-
-    if (!result.length) {
-      return { success: false, error: 'Assignment not found or not ready for verification' };
+    if (approved) {
+      updateData.status = 'verified';
+    } else {
+      updateData.status = 'rejected';
     }
 
-    if (approved) {
-      // Update provider balance when action is verified
-      const assignment = result[0];
-      const transactionDetails = await db.select({
-        providerId: transactions.providerId,
-        providerEarnings: transactions.providerEarnings
-      })
-      .from(transactions)
-      .where(eq(transactions.id, assignment.transactionId))
-      .limit(1);
+    const { data, error } = await supabase
+      .from('action_assignments')
+      .update(updateData)
+      .eq('id', assignmentId)
+      .eq('status', 'completed')
+      .select()
+      .single();
 
-      if (transactionDetails.length) {
-        const earnings = parseFloat(transactionDetails[0].providerEarnings || '0');
-        await db.execute(sql`
-          UPDATE users 
-          SET balance = balance + ${earnings} 
-          WHERE id = ${transactionDetails[0].providerId}
-        `);
+    if (error || !data) {
+      return { success: false, error: 'Assignment not found or not completed' };
+    }
+
+    // If approved, update provider earnings and transaction fulfillment
+    if (approved) {
+      // Get transaction details
+      const { data: transaction, error: transactionError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('id', data.transaction_id)
+        .single();
+
+      if (!transactionError && transaction) {
+        // Update provider earnings
+        const { error: earningsError } = await supabase
+          .from('users')
+          .update({
+            balance: (parseFloat(transaction.provider_earnings || '0') + parseFloat(transaction.provider_earnings || '0')).toString()
+          })
+          .eq('id', data.provider_id);
+
+        if (earningsError) {
+          console.error('Error updating provider earnings:', earningsError);
+        }
+
+        // Check if all assignments for this transaction are completed
+        const { data: allAssignments, error: assignmentsError } = await supabase
+          .from('action_assignments')
+          .select('status')
+          .eq('transaction_id', data.transaction_id);
+
+        if (!assignmentsError && allAssignments) {
+          const completedCount = allAssignments.filter(a => a.status === 'verified').length;
+          const totalCount = allAssignments.length;
+
+          if (completedCount >= totalCount) {
+            // Mark transaction as completed
+            await supabase
+              .from('transactions')
+              .update({
+                status: 'completed',
+                completed_at: new Date().toISOString()
+              })
+              .eq('id', data.transaction_id);
+          }
+        }
       }
     }
 
@@ -275,30 +290,44 @@ export async function verifyAssignmentCompletion(
   }
 }
 
-// Get assignment statistics for admin dashboard
+// Get assignment statistics
 export async function getAssignmentStats() {
-  const statsQuery = await db.execute(sql`
-    SELECT status, COUNT(*) as count 
-    FROM action_assignments 
-    GROUP BY status
-  `);
+  try {
+    const { data: assignments, error } = await supabase
+      .from('action_assignments')
+      .select('status');
 
-  const result = {
-    total: 0,
-    assigned: 0,
-    in_progress: 0,
-    completed: 0,
-    verified: 0,
-    failed: 0
-  };
-
-  statsQuery.rows.forEach((row: any) => {
-    const count = parseInt(row.count);
-    result.total += count;
-    if (result.hasOwnProperty(row.status)) {
-      result[row.status as keyof typeof result] = count;
+    if (error) {
+      console.error('Error getting assignment stats:', error);
+      return {
+        total: 0,
+        assigned: 0,
+        inProgress: 0,
+        completed: 0,
+        verified: 0,
+        rejected: 0
+      };
     }
-  });
 
-  return result;
-}
+    const stats = {
+      total: assignments?.length || 0,
+      assigned: assignments?.filter(a => a.status === 'assigned').length || 0,
+      inProgress: assignments?.filter(a => a.status === 'in_progress').length || 0,
+      completed: assignments?.filter(a => a.status === 'completed').length || 0,
+      verified: assignments?.filter(a => a.status === 'verified').length || 0,
+      rejected: assignments?.filter(a => a.status === 'rejected').length || 0
+    };
+
+    return stats;
+  } catch (error) {
+    console.error('Error getting assignment stats:', error);
+    return {
+      total: 0,
+      assigned: 0,
+      inProgress: 0,
+      completed: 0,
+      verified: 0,
+      rejected: 0
+    };
+  }
+} 

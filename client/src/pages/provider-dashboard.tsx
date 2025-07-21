@@ -13,6 +13,26 @@ import { apiRequest } from "@/lib/queryClient";
 import { useLocation, Link } from "wouter";
 import { calculateWithdrawalFee } from "@/lib/paystack";
 import AssignmentCard from "@/components/assignment-card";
+import ContentValidator from "@/components/content-validator";
+import { AIReVerificationRequest } from "@/components/ai-reverification-request";
+import { WalletDashboard } from "@/components/wallet-dashboard";
+
+function AIReVerificationSection() {
+  const { data: rejectedAssignments = [], refetch } = useQuery({
+    queryKey: ['/api/provider/rejected-assignments'],
+  });
+
+  const handleReVerificationComplete = () => {
+    refetch();
+  };
+
+  return (
+    <AIReVerificationRequest
+      rejectedAssignments={rejectedAssignments}
+      onReVerificationComplete={handleReVerificationComplete}
+    />
+  );
+}
 
 export default function ProviderDashboard() {
   const { user, logout } = useAuth();
@@ -23,16 +43,24 @@ export default function ProviderDashboard() {
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [assignmentFilter, setAssignmentFilter] = useState("all");
+  const [contentValidator, setContentValidator] = useState({ open: false, content: '', contentType: 'description' as const });
 
-  // Redirect if not provider
-  if (user?.role !== 'provider') {
+  // Redirect if not provider - only redirect if we have user data and they're not a provider
+  if (user && user.role !== 'provider') {
     setLocation('/');
     return null;
   }
 
-  const { data: services = [] } = useQuery({
-    queryKey: ['/api/services/provider'],
+  // Fetch services from provider-specific API endpoint
+  const { data: allServices = [] } = useQuery({
+    queryKey: ['/api/services/provider-view'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/services/provider-view');
+      return response.json();
+    },
   });
+
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
   const { data: transactions = [] } = useQuery({
     queryKey: ['/api/transactions'],
@@ -42,8 +70,12 @@ export default function ProviderDashboard() {
     queryKey: ['/api/withdrawals'],
   });
 
-  const { data: assignments = [], refetch: refetchAssignments } = useQuery({
-    queryKey: ['/api/assignments'],
+  const { data: actionAssignments = [], refetch: refetchActionAssignments } = useQuery({
+    queryKey: ['/api/action-assignments'],
+  });
+
+  const { data: providerServices = [], refetch: refetchProviderServices } = useQuery({
+    queryKey: ['/api/provider-services'],
   });
 
   const createServiceMutation = useMutation({
@@ -70,6 +102,56 @@ export default function ProviderDashboard() {
     },
   });
 
+  const completeActionMutation = useMutation({
+    mutationFn: async (assignmentId: number) => {
+      const res = await apiRequest('PATCH', `/api/action-assignments/${assignmentId}`, { 
+        status: 'completed' 
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/action-assignments'] });
+      toast({ title: "Success", description: "Action marked as completed" });
+    },
+  });
+
+  const handleCompleteAction = (assignmentId: number) => {
+    completeActionMutation.mutate(assignmentId);
+  };
+
+  const handleServiceSelection = async (service: any, isSelected: boolean) => {
+    try {
+      if (isSelected) {
+        // Remove service
+        const providerService = providerServices.find((ps: any) => 
+          ps.platform === service.platform && ps.actionType === service.type
+        );
+        if (providerService) {
+          await apiRequest('DELETE', `/api/provider-services/${providerService.id}`);
+        }
+      } else {
+        // Add service
+        await apiRequest('POST', '/api/provider-services', {
+          platform: service.platform,
+          actionType: service.type,
+          isActive: true
+        });
+      }
+      
+      refetchProviderServices();
+      toast({ 
+        title: "Success", 
+        description: isSelected ? "Service removed" : "Service added" 
+      });
+    } catch (error) {
+      toast({ 
+        title: "Error", 
+        description: "Failed to update service selection", 
+        variant: "destructive" 
+      });
+    }
+  };
+
   const handleCreateService = (formData: FormData) => {
     const data = {
       type: formData.get('type'),
@@ -95,13 +177,13 @@ export default function ProviderDashboard() {
     requestWithdrawalMutation.mutate(withdrawalAmount);
   };
 
-  const totalEarnings = transactions
-    .filter((t: any) => t.status === 'completed')
-    .reduce((sum: number, t: any) => sum + parseFloat(t.providerEarnings || '0'), 0);
+  const totalEarnings = actionAssignments
+    .filter((a: any) => a.status === 'completed')
+    .reduce((sum: number, a: any) => sum + 2.00, 0);
 
-  const pendingEarnings = transactions
-    .filter((t: any) => t.status === 'pending')
-    .reduce((sum: number, t: any) => sum + parseFloat(t.providerEarnings || '0'), 0);
+  const pendingEarnings = actionAssignments
+    .filter((a: any) => a.status === 'assigned' || a.status === 'in_progress')
+    .reduce((sum: number, a: any) => sum + 2.00, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -112,9 +194,9 @@ export default function ProviderDashboard() {
             <h2 className="text-xl font-bold text-primary">Provider Dashboard</h2>
             <p className="text-sm text-gray-600 mt-1">Welcome, {user?.name}</p>
             <div className="mt-4 p-3 bg-green-50 rounded-lg">
-              <div className="text-lg font-bold text-green-700">
-                {user?.balance?.toFixed(2) || '0.00'} KES
-              </div>
+                              <div className="text-lg font-bold text-green-700">
+                  {Number(user?.balance || 0).toFixed(2)} KES
+                </div>
               <div className="text-sm text-green-600">Available Balance</div>
             </div>
           </div>
@@ -145,6 +227,18 @@ export default function ProviderDashboard() {
             </button>
             
             <button
+              onClick={() => setActiveTab("service-selection")}
+              className={`w-full flex items-center px-6 py-3 text-left ${
+                activeTab === "service-selection" 
+                  ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <i className="fas fa-check-square mr-3"></i>
+              Service Selection
+            </button>
+            
+            <button
               onClick={() => setActiveTab("orders")}
               className={`w-full flex items-center px-6 py-3 text-left ${
                 activeTab === "orders" 
@@ -157,6 +251,18 @@ export default function ProviderDashboard() {
             </button>
             
             <button
+              onClick={() => setActiveTab("ai-reverification")}
+              className={`w-full flex items-center px-6 py-3 text-left ${
+                activeTab === "ai-reverification" 
+                  ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <i className="fas fa-robot mr-3"></i>
+              AI Re-verification
+            </button>
+            
+            <button
               onClick={() => setActiveTab("earnings")}
               className={`w-full flex items-center px-6 py-3 text-left ${
                 activeTab === "earnings" 
@@ -164,16 +270,8 @@ export default function ProviderDashboard() {
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <i className="fas fa-money-bill-wave mr-3"></i>
-              Earnings & Withdrawals
-            </button>
-            
-            <button
-              onClick={() => setLocation('/')}
-              className="w-full flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 text-left"
-            >
-              <i className="fas fa-home mr-3"></i>
-              Home
+              <i className="fas fa-wallet mr-3"></i>
+              Wallet
             </button>
             
             <button
@@ -227,10 +325,10 @@ export default function ProviderDashboard() {
                       <div className="p-3 rounded-full bg-blue-100">
                         <i className="fas fa-list text-blue-600"></i>
                       </div>
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-600">Active Services</p>
-                        <p className="text-2xl font-bold">{services.length}</p>
-                      </div>
+                                              <div className="ml-4">
+                          <p className="text-sm font-medium text-gray-600">Active Services</p>
+                          <p className="text-2xl font-bold">{selectedServices.length}</p>
+                        </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -242,8 +340,8 @@ export default function ProviderDashboard() {
                         <i className="fas fa-shopping-cart text-purple-600"></i>
                       </div>
                       <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                        <p className="text-2xl font-bold">{transactions.length}</p>
+                        <p className="text-sm font-medium text-gray-600">Total Actions</p>
+                        <p className="text-2xl font-bold">{actionAssignments.length}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -253,22 +351,23 @@ export default function ProviderDashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
                   <CardContent className="p-6">
-                    <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
+                    <h3 className="text-lg font-semibold mb-4">Recent Actions</h3>
                     <div className="space-y-3">
-                      {transactions.slice(0, 5).map((transaction: any) => (
-                        <div key={transaction.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      {actionAssignments.slice(0, 5).map((assignment: any) => (
+                        <div key={assignment.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                           <div>
-                            <p className="font-medium">Order #{transaction.id}</p>
-                            <p className="text-sm text-gray-600">{transaction.quantity} actions</p>
+                            <p className="font-medium">Action #{assignment.id}</p>
+                            <p className="text-sm text-gray-600">1 {assignment.actionType} for {assignment.platform}</p>
                           </div>
                           <div className="text-right">
-                            <p className="font-medium text-green-600">{parseFloat(transaction.providerEarnings || '0').toFixed(2)} KES</p>
+                            <p className="font-medium text-green-600">2.00 KES</p>
                             <span className={`text-xs px-2 py-1 rounded-full ${
-                              transaction.status === 'completed' ? 'bg-green-100 text-green-600' :
-                              transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
+                              assignment.status === 'completed' ? 'bg-green-100 text-green-600' :
+                              assignment.status === 'in_progress' ? 'bg-blue-100 text-blue-600' :
+                              assignment.status === 'assigned' ? 'bg-yellow-100 text-yellow-600' :
                               'bg-red-100 text-red-600'
                             }`}>
-                              {transaction.status}
+                              {assignment.status.replace('_', ' ')}
                             </span>
                           </div>
                         </div>
@@ -314,103 +413,92 @@ export default function ProviderDashboard() {
           {activeTab === "services" && (
             <div>
               <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold">My Services</h1>
-                <Dialog open={serviceModalOpen} onOpenChange={setServiceModalOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-primary hover:bg-primary-dark">
-                      <i className="fas fa-plus mr-2"></i>
-                      Add Service
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create New Service</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      handleCreateService(new FormData(e.target as HTMLFormElement));
-                    }}>
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="platform">Platform</Label>
-                          <Select name="platform" required>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Choose platform" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="instagram">Instagram</SelectItem>
-                              <SelectItem value="youtube">YouTube</SelectItem>
-                              <SelectItem value="twitter">Twitter</SelectItem>
-                              <SelectItem value="tiktok">TikTok</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="type">Service Type</Label>
-                          <Select name="type" required>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Choose service type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="followers">Followers</SelectItem>
-                              <SelectItem value="likes">Likes</SelectItem>
-                              <SelectItem value="views">Views</SelectItem>
-                              <SelectItem value="comments">Comments</SelectItem>
-                              <SelectItem value="subscribers">Subscribers</SelectItem>
-                              <SelectItem value="reposts">Reposts</SelectItem>
-                              <SelectItem value="shares">Shares</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="description">Description</Label>
-                          <Input 
-                            name="description" 
-                            placeholder="Describe your service"
-                            required
-                          />
-                        </div>
-                        
-                        <Button type="submit" disabled={createServiceMutation.isPending} className="w-full">
-                          Create Service
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                <h1 className="text-3xl font-bold">Available Services</h1>
+                <Button 
+                  onClick={() => {
+                    // Save selected services to backend
+                    apiRequest('POST', '/api/provider/services', { serviceIds: selectedServices })
+                      .then(() => {
+                        toast({ title: "Success", description: "Services updated successfully" });
+                      })
+                      .catch(() => {
+                        toast({ title: "Error", description: "Failed to update services", variant: "destructive" });
+                      });
+                  }}
+                  className="bg-primary hover:bg-primary-dark"
+                  disabled={selectedServices.length === 0}
+                >
+                  <i className="fas fa-save mr-2"></i>
+                  Save Selection ({selectedServices.length} selected)
+                </Button>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {services.map((service: any) => (
-                  <Card key={service.id}>
+                {allServices.map((service: any) => (
+                  <Card 
+                    key={service.id} 
+                    className={`cursor-pointer transition-all ${
+                      selectedServices.includes(service.id) 
+                        ? 'ring-2 ring-primary bg-primary/5' 
+                        : 'hover:shadow-md'
+                    }`}
+                    onClick={() => {
+                      setSelectedServices(prev => 
+                        prev.includes(service.id)
+                          ? prev.filter(id => id !== service.id)
+                          : [...prev, service.id]
+                      );
+                    }}
+                  >
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center">
-                          <i className={`fab fa-${service.platform} text-xl mr-2`}></i>
+                          <i className={`${service.icon} text-xl mr-2`}></i>
                           <span className="text-sm font-medium text-gray-600 capitalize">{service.platform}</span>
                         </div>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          service.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
-                        }`}>
-                          {service.status}
-                        </span>
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            selectedServices.includes(service.id) 
+                              ? 'bg-primary text-white' 
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {selectedServices.includes(service.id) ? 'Selected' : 'Available'}
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={selectedServices.includes(service.id)}
+                            onChange={() => {}} // Handled by card click
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
                       </div>
                       
-                      <h3 className="text-lg font-semibold mb-2 capitalize">
-                        {service.platform} {service.type}
+                      <h3 className="text-lg font-semibold mb-2">
+                        {service.name}
                       </h3>
-                      <p className="text-gray-600 text-sm mb-4">{service.description}</p>
+                      <p className="text-gray-600 text-sm mb-4">{service.providerDescription}</p>
                       
-                      <div className="flex justify-between text-sm">
-                        <span>Orders: {service.totalOrders || 0}</span>
-                        <span>Rating: {Number(service.rating || 0).toFixed(1)}</span>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Your Earnings:</span>
+                          <span className="font-semibold text-green-600">{service.providerPrice.toFixed(2)} KES</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Delivery:</span>
+                          <span>{service.deliveryTime}</span>
+                        </div>
                       </div>
                       
-                      <div className="text-right mt-2">
-                        <div className="text-lg font-bold text-primary">2 KES</div>
-                        <div className="text-xs text-gray-500">earnings per action</div>
+                      <div className="mt-4 pt-4 border-t">
+                        <div className="text-xs text-gray-500 mb-2">Requirements:</div>
+                        <ul className="text-xs text-gray-600 space-y-1">
+                          {service.requirements.map((req, index) => (
+                            <li key={index} className="flex items-center">
+                              <i className="fas fa-check text-green-500 mr-2 text-xs"></i>
+                              {req}
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     </CardContent>
                   </Card>
@@ -419,60 +507,143 @@ export default function ProviderDashboard() {
             </div>
           )}
 
+          {activeTab === "service-selection" && (
+            <div>
+              <h1 className="text-3xl font-bold mb-8">Select Services to Offer</h1>
+              
+              <div className="mb-6">
+                <p className="text-gray-600 mb-4">
+                  Select which services you want to offer. You'll only receive orders for services you've selected.
+                  The system will prioritize providers with better performance history.
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {allServices.map((service: any) => {
+                  const isSelected = providerServices.some((ps: any) => 
+                    ps.platform === service.platform && ps.actionType === service.type
+                  );
+                  
+                  return (
+                    <Card 
+                      key={service.id} 
+                      className={`cursor-pointer transition-all ${
+                        isSelected 
+                          ? 'ring-2 ring-primary bg-primary/5' 
+                          : 'hover:shadow-md'
+                      }`}
+                      onClick={() => handleServiceSelection(service, isSelected)}
+                    >
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center">
+                            <i className={`${service.icon} text-xl mr-2`}></i>
+                            <span className="text-sm font-medium text-gray-600 capitalize">{service.platform}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              isSelected 
+                                ? 'bg-primary text-white' 
+                                : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {isSelected ? 'Selected' : 'Available'}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {}} // Handled by card click
+                              className="w-4 h-4 text-primary"
+                            />
+                          </div>
+                        </div>
+                        
+                        <h3 className="text-lg font-semibold mb-2">
+                          {service.name}
+                        </h3>
+                        <p className="text-gray-600 text-sm mb-4">{service.providerDescription}</p>
+                        
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span>Your Earnings:</span>
+                            <span className="font-semibold text-green-600">2.00 KES</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Platform:</span>
+                            <span className="capitalize">{service.platform}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Action Type:</span>
+                            <span className="capitalize">{service.type}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {activeTab === "orders" && (
             <div>
-              <h1 className="text-3xl font-bold mb-8">Order Management</h1>
+              <h1 className="text-3xl font-bold mb-8">Action Assignments</h1>
               
               <Card>
                 <CardContent className="p-6">
                   <div className="space-y-4">
-                    {transactions.length === 0 ? (
+                    {actionAssignments.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
                         <i className="fas fa-clipboard-list text-4xl mb-4"></i>
-                        <p>No orders yet</p>
+                        <p>No action assignments yet</p>
+                        <p className="text-sm mt-2">You'll see individual actions here when buyers purchase services you offer</p>
                       </div>
                     ) : (
-                      transactions.map((transaction: any) => (
-                        <div key={transaction.id} className="p-4 border rounded-lg">
+                      actionAssignments.map((assignment: any) => (
+                        <div key={assignment.id} className="p-4 border rounded-lg">
                           <div className="flex justify-between items-start mb-3">
                             <div>
-                              <h3 className="font-semibold">Order #{transaction.id}</h3>
+                              <h3 className="font-semibold">Action #{assignment.id}</h3>
                               <p className="text-sm text-gray-600">
-                                {transaction.quantity} actions for {transaction.service?.platform}
+                                1 {assignment.actionType} for {assignment.platform}
                               </p>
                             </div>
                             <span className={`px-3 py-1 rounded-full text-xs ${
-                              transaction.status === 'completed' ? 'bg-green-100 text-green-600' :
-                              transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
+                              assignment.status === 'completed' ? 'bg-green-100 text-green-600' :
+                              assignment.status === 'in_progress' ? 'bg-blue-100 text-blue-600' :
+                              assignment.status === 'assigned' ? 'bg-yellow-100 text-yellow-600' :
                               'bg-red-100 text-red-600'
                             }`}>
-                              {transaction.status}
+                              {assignment.status.replace('_', ' ')}
                             </span>
                           </div>
                           
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
                               <p className="text-gray-600">Target URL:</p>
-                              <p className="truncate">{transaction.targetUrl}</p>
+                              <p className="truncate">{assignment.targetUrl}</p>
                             </div>
                             <div>
                               <p className="text-gray-600">Your Earnings:</p>
                               <p className="font-semibold text-green-600">
-                                {parseFloat(transaction.providerEarnings || '0').toFixed(2)} KES
+                                2.00 KES
                               </p>
                             </div>
                           </div>
                           
-                          {transaction.commentText && (
+                          {assignment.commentText && (
                             <div className="mt-3">
                               <p className="text-gray-600 text-sm">Comment Required:</p>
-                              <p className="text-sm bg-gray-50 p-2 rounded">{transaction.commentText}</p>
+                              <p className="text-sm bg-gray-50 p-2 rounded">{assignment.commentText}</p>
                             </div>
                           )}
                           
-                          {transaction.status === 'pending' && (
+                          {assignment.status === 'assigned' && (
                             <div className="mt-4">
-                              <Button size="sm" className="mr-2">
+                              <Button 
+                                size="sm" 
+                                className="mr-2"
+                                onClick={() => handleCompleteAction(assignment.id)}
+                              >
                                 Mark as Completed
                               </Button>
                               <Button size="sm" variant="outline">
@@ -489,79 +660,49 @@ export default function ProviderDashboard() {
             </div>
           )}
 
+          {activeTab === "ai-reverification" && (
+            <div>
+              <h1 className="text-3xl font-bold mb-8">AI Re-verification</h1>
+              <AIReVerificationSection />
+            </div>
+          )}
+
           {activeTab === "earnings" && (
             <div>
-              <h1 className="text-3xl font-bold mb-8">Earnings & Withdrawals</h1>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                  <CardContent className="p-6">
-                    <h3 className="text-lg font-semibold mb-4">Withdrawal History</h3>
-                    <div className="space-y-3">
-                      {withdrawals.length === 0 ? (
-                        <div className="text-center py-4 text-gray-500">
-                          <p>No withdrawals yet</p>
-                        </div>
-                      ) : (
-                        withdrawals.map((withdrawal: any) => (
-                          <div key={withdrawal.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                            <div>
-                              <p className="font-medium">{parseFloat(withdrawal.amount).toFixed(2)} KES</p>
-                              <p className="text-sm text-gray-600">
-                                Net: {parseFloat(withdrawal.netAmount).toFixed(2)} KES
-                              </p>
-                            </div>
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                              withdrawal.status === 'completed' ? 'bg-green-100 text-green-600' :
-                              withdrawal.status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
-                              'bg-red-100 text-red-600'
-                            }`}>
-                              {withdrawal.status}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardContent className="p-6">
-                    <h3 className="text-lg font-semibold mb-4">Earnings Breakdown</h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span>Total Completed Orders:</span>
-                        <span className="font-semibold">
-                          {transactions.filter((t: any) => t.status === 'completed').length}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Total Earnings:</span>
-                        <span className="font-semibold text-green-600">
-                          {totalEarnings.toFixed(2)} KES
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Pending Earnings:</span>
-                        <span className="font-semibold text-yellow-600">
-                          {pendingEarnings.toFixed(2)} KES
-                        </span>
-                      </div>
-                      <hr />
-                      <div className="flex justify-between text-lg font-bold">
-                        <span>Available for Withdrawal:</span>
-                        <span className="text-primary">
-                          {(user?.balance || 0).toFixed(2)} KES
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <h1 className="text-3xl font-bold mb-8">Wallet</h1>
+              <WalletDashboard />
             </div>
           )}
         </div>
       </div>
+
+      {/* Content Validator Dialog */}
+      <Dialog open={contentValidator.open} onOpenChange={(open) => setContentValidator(prev => ({ ...prev, open }))}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Content Validation</DialogTitle>
+          </DialogHeader>
+          <ContentValidator
+            content={contentValidator.content}
+            contentType={contentValidator.contentType}
+            onValidationComplete={(isValid, issues) => {
+              if (isValid) {
+                toast({
+                  title: 'Content Validated',
+                  description: 'Your content is appropriate and ready to use!'
+                });
+              } else {
+                toast({
+                  title: 'Content Issues Found',
+                  description: 'Please review the validation results before proceeding.',
+                  variant: 'destructive'
+                });
+              }
+            }}
+            onClose={() => setContentValidator(prev => ({ ...prev, open: false }))}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

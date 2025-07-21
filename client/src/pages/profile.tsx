@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import SocialMediaAccounts from '@/components/social-media-accounts';
+import EmailNotifications from '@/components/email-notifications';
 import { apiRequest } from '@/lib/queryClient';
 
 export default function Profile() {
@@ -53,11 +54,61 @@ export default function Profile() {
   };
 
   if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div>Loading...</div>
+      return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto py-8 px-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Profile Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Enter your full name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="Enter your email"
+                    type="email"
+                  />
+                </div>
+                <Button type="submit" disabled={isUpdating}>
+                  {isUpdating ? 'Updating...' : 'Update Profile'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Social Media Accounts */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Social Media Accounts</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SocialMediaAccounts />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Email Notifications */}
+        <div className="mt-8">
+          <EmailNotifications />
+        </div>
       </div>
-    );
+    </div>
+  );
   }
 
   return (

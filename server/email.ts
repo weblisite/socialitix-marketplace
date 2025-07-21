@@ -1,7 +1,6 @@
 import { Resend } from 'resend';
-import { db } from './storage';
-import { emailTemplates, emailLogs, type InsertEmailLog } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { supabase } from './supabase';
+import { type InsertEmailLog } from '@shared/schema';
 
 if (!process.env.RESEND_API_KEY) {
   console.warn('RESEND_API_KEY not found - email functionality will be disabled');
@@ -25,15 +24,17 @@ export async function sendEmail({ to, templateName, variables = {}, metadata = {
 
   try {
     // Get email template
-    const template = await db.select().from(emailTemplates)
-      .where(eq(emailTemplates.name, templateName))
+    const { data: templates, error: templateError } = await supabase
+      .from('email_templates')
+      .select('*')
+      .eq('name', templateName)
       .limit(1);
 
-    if (!template.length) {
+    if (templateError || !templates || templates.length === 0) {
       throw new Error(`Template '${templateName}' not found`);
     }
 
-    const emailTemplate = template[0];
+    const emailTemplate = templates[0];
     
     // Replace variables in template
     let subject = emailTemplate.subject;
@@ -59,14 +60,14 @@ export async function sendEmail({ to, templateName, variables = {}, metadata = {
     // Log email
     const logData: InsertEmailLog = {
       recipient: to,
-      templateId: emailTemplate.id,
+      template_id: emailTemplate.id,
       subject,
       status: 'sent',
-      externalId: result.data?.id,
-      metadata,
+      external_id: result.data?.id,
+      metadata: { templateName, variables, ...metadata },
     };
 
-    await db.insert(emailLogs).values(logData);
+    await supabase.from('email_logs').insert([logData]);
 
     return { success: true, id: result.data?.id };
   } catch (error) {
@@ -75,14 +76,14 @@ export async function sendEmail({ to, templateName, variables = {}, metadata = {
     // Log failed email
     const logData: InsertEmailLog = {
       recipient: to,
-      templateId: null,
+      template_id: undefined,
       subject: `Failed: ${templateName}`,
       status: 'failed',
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      metadata,
+      error_message: error instanceof Error ? error.message : 'Unknown error',
+      metadata: { templateName, variables, ...metadata },
     };
 
-    await db.insert(emailLogs).values(logData);
+    await supabase.from('email_logs').insert([logData]);
     
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
@@ -217,12 +218,78 @@ export async function initializeEmailTemplates() {
         <p><small>Offer valid until {{expiryDate}}. Terms and conditions apply.</small></p>
       `,
       type: 'marketing'
+    },
+    {
+      name: 'ai_reverification_success',
+      subject: 'AI Re-verification Successful - You\'ve Been Credited!',
+      htmlContent: `
+        <h1>AI Re-verification Successful!</h1>
+        <p>Hi {{providerName}},</p>
+        <p>Great news! Our AI system has reviewed your proof and overturned the buyer's rejection.</p>
+        <h3>Re-verification Details:</h3>
+        <ul>
+          <li>Action: {{actionType}} on {{platform}}</li>
+          <li>AI Confidence: {{confidence}}</li>
+          <li>Reason: {{reason}}</li>
+          <li>Amount Credited: {{earnings}} KES</li>
+        </ul>
+        <p><strong>What happened:</strong></p>
+        <p>Your proof was initially rejected by the buyer, but our AI analysis determined that your submission was actually valid. 
+        The AI found evidence that you completed the required action correctly.</p>
+        <p>Your account has been credited with {{earnings}} KES for this assignment.</p>
+        <p><a href="{{dashboardUrl}}">View Your Balance</a></p>
+        <p><small>This system helps protect honest providers from unfair rejections.</small></p>
+      `,
+      type: 'transactional'
+    },
+    {
+      name: 'rejection_overturned',
+      subject: 'Assignment Rejection Overturned by AI',
+      htmlContent: `
+        <h1>Assignment Rejection Overturned</h1>
+        <p>Hi {{buyerName}},</p>
+        <p>We wanted to inform you that a rejection you made has been overturned by our AI verification system.</p>
+        <h3>Assignment Details:</h3>
+        <ul>
+          <li>Action: {{actionType}} on {{platform}}</li>
+          <li>AI Confidence: {{confidence}}</li>
+          <li>Reason: {{reason}}</li>
+        </ul>
+        <p><strong>What happened:</strong></p>
+        <p>Our AI system analyzed the provider's proof and determined that the action was actually completed correctly. 
+        The provider has been credited for their work.</p>
+        <p>This system ensures fairness for both buyers and providers by using advanced image analysis to verify proof submissions.</p>
+        <p><a href="{{dashboardUrl}}">View Assignment Details</a></p>
+        <p><small>If you believe this was an error, please contact our support team.</small></p>
+      `,
+      type: 'transactional'
+    },
+    {
+      name: 'account_banned',
+      subject: 'Account Suspended - Multiple Violations Detected',
+      htmlContent: `
+        <h1>Account Suspended</h1>
+        <p>Hi {{userName}},</p>
+        <p>Your account has been suspended due to multiple violations of our terms of service.</p>
+        <h3>Reason:</h3>
+        <p>{{reason}}</p>
+        <p><strong>What this means:</strong></p>
+        <ul>
+          <li>You cannot access your account or perform actions</li>
+          <li>Any pending earnings may be forfeited</li>
+          <li>Your services have been removed from the marketplace</li>
+        </ul>
+        <p><strong>Appeal Process:</strong></p>
+        <p>{{appealInstructions}}</p>
+        <p><small>This action was taken automatically by our fraud detection system.</small></p>
+      `,
+      type: 'transactional'
     }
   ];
 
   for (const template of templates) {
     try {
-      await db.insert(emailTemplates).values(template).onConflictDoNothing();
+      await supabase.from('email_templates').upsert([template], { onConflict: 'name' });
     } catch (error) {
       console.error(`Error inserting template ${template.name}:`, error);
     }

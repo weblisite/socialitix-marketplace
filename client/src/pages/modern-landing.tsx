@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { useMutation } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { supabase, createUserProfile } from '@/lib/supabase';
 
 export default function ModernLanding() {
   const { user, login } = useAuth();
@@ -40,22 +40,60 @@ export default function ModernLanding() {
     return () => clearInterval(interval);
   }, []);
 
+  // Redirect logged-in users to their dashboard - only if we have user data
+  useEffect(() => {
+    if (user) {
+      const userRole = user.role || 'buyer';
+      setLocation(`/${userRole}`);
+    }
+  }, [user, setLocation]);
+
   // Authentication mutations
   const registerMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return apiRequest('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(data)
+      // First, sign up with Supabase Auth
+      const { data: authData, error } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            name: data.name,
+            role: data.role,
+          }
+        }
       });
+      if (error) throw error;
+      
+      // Then, create user profile in our database
+      if (authData.user) {
+        await createUserProfile({
+          email: data.email,
+          name: data.name,
+          role: data.role,
+        });
+      }
+      
+      return authData;
     },
     onSuccess: (data) => {
-      login(data.token, data.user);
-      setAuthOpen(false);
-      toast({
-        title: 'Welcome to EngageMarket!',
-        description: `Your ${data.user.role} account has been created successfully.`
-      });
-      setLocation(`/${data.user.role}`);
+      if (data.user) {
+        setAuthOpen(false);
+        toast({
+          title: 'Account Created Successfully!',
+          description: 'Please sign in with your new account to continue.'
+        });
+        // Switch to login mode for the user to sign in
+        setAuthMode('login');
+        setFormData(prev => ({ 
+          ...prev, 
+          email: formData.email, 
+          password: '',
+          name: '',
+          role: formData.role 
+        }));
+        // Reopen the modal in login mode
+        setTimeout(() => setAuthOpen(true), 500);
+      }
     },
     onError: (error: any) => {
       toast({
@@ -68,19 +106,63 @@ export default function ModernLanding() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: Pick<typeof formData, 'email' | 'password'>) => {
-      return apiRequest('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(data)
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
       });
+      if (error) throw error;
+      return authData;
     },
-    onSuccess: (data) => {
-      login(data.token, data.user);
-      setAuthOpen(false);
-      toast({
-        title: 'Welcome back!',
-        description: `Successfully signed in to your ${data.user.role} account.`
-      });
-      setLocation(`/${data.user.role}`);
+    onSuccess: async (data) => {
+      if (data.user) {
+        try {
+          // Fetch user profile to get the correct role
+          const response = await fetch(`http://localhost:5000/api/user/profile`, {
+            headers: {
+              'Authorization': `Bearer ${data.session?.access_token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const userProfile = await response.json();
+            const userRole = userProfile.role || data.user.user_metadata?.role || 'buyer';
+            const userName = userProfile.name || data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'User';
+            
+            login(data.user.email!, userName);
+            setAuthOpen(false);
+            toast({
+              title: 'Welcome back!',
+              description: `Successfully signed in to your ${userRole} account.`
+            });
+            setLocation(`/${userRole}`);
+          } else {
+            // Fallback to metadata if profile fetch fails
+            const userRole = data.user.user_metadata?.role || 'buyer';
+            const userName = data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'User';
+            
+            login(data.user.email!, userName);
+            setAuthOpen(false);
+            toast({
+              title: 'Welcome back!',
+              description: `Successfully signed in to your ${userRole} account.`
+            });
+            setLocation(`/${userRole}`);
+          }
+        } catch (error) {
+          // Fallback to metadata if profile fetch fails
+          const userRole = data.user.user_metadata?.role || 'buyer';
+          const userName = data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'User';
+          
+          login(data.user.email!, userName);
+          setAuthOpen(false);
+          toast({
+            title: 'Welcome back!',
+            description: `Successfully signed in to your ${userRole} account.`
+          });
+          setLocation(`/${userRole}`);
+        }
+      }
     },
     onError: (error: any) => {
       toast({

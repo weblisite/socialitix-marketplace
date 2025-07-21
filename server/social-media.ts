@@ -1,6 +1,5 @@
-import { db } from './storage';
-import { socialMediaAccounts, actionAssignments, type InsertSocialMediaAccount } from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { supabase } from './supabase';
+import { type InsertSocialMediaAccount } from '@shared/schema';
 
 // Social Media API Configuration
 interface SocialMediaConfig {
@@ -52,17 +51,25 @@ export async function linkSocialMediaAccount(
   accessToken?: string
 ): Promise<{ success: boolean; accountId?: number; error?: string }> {
   try {
-    const accountData: InsertSocialMediaAccount = {
-      userId,
+    const accountData = {
+      user_id: userId,
       platform,
       username,
-      accessToken,
-      isVerified: false
+      access_token: accessToken,
+      verification_data: {}
     };
 
-    const result = await db.insert(socialMediaAccounts).values(accountData).returning();
+    const { data, error } = await supabase
+      .from('social_media_accounts')
+      .insert([accountData])
+      .select()
+      .single();
     
-    return { success: true, accountId: result[0].id };
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true, accountId: data.id };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
@@ -70,14 +77,17 @@ export async function linkSocialMediaAccount(
 
 // Get linked accounts for a user
 export async function getUserSocialAccounts(userId: number) {
-  return await db.select({
-    id: socialMediaAccounts.id,
-    platform: socialMediaAccounts.platform,
-    username: socialMediaAccounts.username,
-    isVerified: socialMediaAccounts.isVerified,
-    lastSync: socialMediaAccounts.lastSync,
-  }).from(socialMediaAccounts)
-    .where(eq(socialMediaAccounts.userId, userId));
+  const { data, error } = await supabase
+    .from('social_media_accounts')
+    .select('id, platform, username, is_verified, last_sync')
+    .eq('user_id', userId);
+  
+  if (error) {
+    console.error('Error getting social accounts:', error);
+    return [];
+  }
+  
+  return data || [];
 }
 
 // Verify action completion (mock implementation for now)
@@ -100,15 +110,14 @@ export async function verifyActionCompletion(
 
   try {
     // Check if provider has linked account for this platform
-    const linkedAccount = await db.select()
-      .from(socialMediaAccounts)
-      .where(and(
-        eq(socialMediaAccounts.userId, providerId),
-        eq(socialMediaAccounts.platform, platform)
-      ))
+    const { data: linkedAccount, error: accountError } = await supabase
+      .from('social_media_accounts')
+      .select('*')
+      .eq('user_id', providerId)
+      .eq('platform', platform)
       .limit(1);
 
-    if (!linkedAccount.length) {
+    if (accountError || !linkedAccount || linkedAccount.length === 0) {
       return { 
         success: false, 
         method: 'manual', 

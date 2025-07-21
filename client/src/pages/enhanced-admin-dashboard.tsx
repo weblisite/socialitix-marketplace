@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { useLocation, Link } from 'wouter';
+import ReportModal from '@/components/report-modal';
 
 export default function EnhancedAdminDashboard() {
   const { user, logout } = useAuth();
@@ -20,9 +21,11 @@ export default function EnhancedAdminDashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [moderationReason, setModerationReason] = useState('');
   const [moderationDialog, setModerationDialog] = useState({ open: false, item: null, action: '' });
+  const [userActionDialog, setUserActionDialog] = useState({ open: false, user: null, action: '' });
+  const [reportModal, setReportModal] = useState({ open: false, targetType: 'user' as const, targetId: 0, targetName: '' });
 
-  // Redirect if not admin
-  if (user?.role !== 'admin') {
+  // Redirect if not admin - only redirect if we have user data and they're not an admin
+  if (user && user.role !== 'admin') {
     setLocation('/');
     return null;
   }
@@ -74,6 +77,20 @@ export default function EnhancedAdminDashboard() {
     },
   });
 
+  const suspendUserMutation = useMutation({
+    mutationFn: async ({ userId, reason }: { userId: number; reason: string }) => {
+      return apiRequest(`/api/admin/users/${userId}/suspend`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: 'User suspended successfully' });
+      setUserActionDialog({ open: false, user: null, action: '' });
+    },
+  });
+
   const handleModeration = (item: any, action: 'approve' | 'reject') => {
     setModerationDialog({ open: true, item, action });
   };
@@ -93,6 +110,28 @@ export default function EnhancedAdminDashboard() {
       id: moderationDialog.item.id, 
       reason: moderationReason 
     });
+  };
+
+  const handleUserAction = (user: any, action: 'suspend' | 'report') => {
+    setUserActionDialog({ open: true, user, action });
+  };
+
+  const submitUserAction = () => {
+    if (!userActionDialog.user || !moderationReason.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please provide a reason for this action',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (userActionDialog.action === 'suspend') {
+      suspendUserMutation.mutate({ 
+        userId: userActionDialog.user.id, 
+        reason: moderationReason 
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -386,10 +425,35 @@ export default function EnhancedAdminDashboard() {
                             {new Date(user.createdAt).toLocaleDateString()}
                           </td>
                           <td className="py-3 px-4">
-                            <Button size="sm" variant="outline">
-                              <i className="fas fa-eye mr-2"></i>
-                              View
-                            </Button>
+                            <div className="flex space-x-2">
+                              <Button size="sm" variant="outline">
+                                <i className="fas fa-eye mr-2"></i>
+                                View
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleUserAction(user, 'suspend')}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <i className="fas fa-ban mr-2"></i>
+                                Suspend
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => setReportModal({ 
+                                  open: true, 
+                                  targetType: 'user', 
+                                  targetId: user.id, 
+                                  targetName: user.name 
+                                })}
+                                className="text-orange-600 hover:text-orange-700"
+                              >
+                                <i className="fas fa-flag mr-2"></i>
+                                Report
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -540,6 +604,60 @@ export default function EnhancedAdminDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* User Action Dialog */}
+        <Dialog open={userActionDialog.open} onOpenChange={(open) => setUserActionDialog({...userActionDialog, open})}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {userActionDialog.action === 'suspend' ? 'Suspend User' : 'User Action'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600 mb-2">User:</p>
+                <div className="bg-gray-50 p-3 rounded border">
+                  <p className="font-medium">{userActionDialog.user?.name}</p>
+                  <p className="text-sm text-gray-600">{userActionDialog.user?.email}</p>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Reason for suspension:
+                </label>
+                <Textarea
+                  value={moderationReason}
+                  onChange={(e) => setModerationReason(e.target.value)}
+                  placeholder="Provide a reason for suspending this user..."
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setUserActionDialog({ open: false, user: null, action: '' })}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={submitUserAction}
+                  disabled={suspendUserMutation.isPending}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  {suspendUserMutation.isPending ? 'Processing...' : 'Suspend User'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Report Modal */}
+        <ReportModal
+          open={reportModal.open}
+          onOpenChange={(open) => setReportModal(prev => ({ ...prev, open }))}
+          targetType={reportModal.targetType}
+          targetId={reportModal.targetId}
+          targetName={reportModal.targetName}
+        />
       </div>
     </div>
   );

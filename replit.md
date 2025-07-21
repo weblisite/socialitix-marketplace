@@ -21,22 +21,23 @@ Preferred communication style: Simple, everyday language.
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js server
 - **Language**: TypeScript with ES modules
-- **Database**: PostgreSQL with Drizzle ORM
-- **Authentication**: JWT-based authentication with bcrypt for password hashing
-- **Database Provider**: Neon Database (serverless PostgreSQL)
+- **Database**: Supabase (PostgreSQL with real-time features)
+- **Authentication**: Supabase Auth with JWT tokens
+- **Database Provider**: Supabase (managed PostgreSQL)
 
 ### Data Storage Solutions
-- **Primary Database**: PostgreSQL via Neon Database
-- **ORM**: Drizzle ORM for type-safe database operations
-- **Schema Management**: Drizzle Kit for migrations and schema management
-- **Session Storage**: PostgreSQL-based session storage with connect-pg-simple
+- **Primary Database**: Supabase PostgreSQL
+- **Client Library**: Supabase JavaScript client for type-safe database operations
+- **Schema Management**: Supabase dashboard and migrations
+- **Session Storage**: Supabase Auth session management
+- **Real-time Features**: Supabase real-time subscriptions
 
 ## Key Components
 
 ### Authentication System
-- JWT-based authentication with role-based access control
+- Supabase Auth with role-based access control
 - Three user roles: buyer, provider, admin
-- Secure password hashing using bcrypt
+- Secure password handling via Supabase Auth
 - Role-specific dashboard routing
 
 ### User Management
@@ -81,9 +82,9 @@ Preferred communication style: Simple, everyday language.
 ## External Dependencies
 
 ### Core Dependencies
-- **Database**: Neon Database (PostgreSQL hosting)
+- **Database**: Supabase (PostgreSQL hosting with real-time features)
 - **Payment Processing**: Paystack for African market payments
-- **Authentication**: JWT for session management
+- **Authentication**: Supabase Auth for session management
 - **UI Components**: Radix UI primitives via shadcn/ui
 
 ### Development Tools
@@ -102,18 +103,18 @@ Preferred communication style: Simple, everyday language.
 ### Build Process
 - **Frontend**: Vite builds optimized static assets to `dist/public`
 - **Backend**: ESBuild bundles server code to `dist/index.js`
-- **Database**: Drizzle migrations handle schema updates
+- **Database**: Supabase handles schema management and migrations
 
 ### Environment Configuration
 - **Development**: `NODE_ENV=development` with hot reloading via Vite
 - **Production**: `NODE_ENV=production` serving static files and API
-- **Database**: `DATABASE_URL` environment variable for PostgreSQL connection
+- **Database**: Supabase environment variables for client configuration
 
 ### Deployment Architecture
 - **Monorepo Structure**: Single repository with client/server/shared code
 - **Static Asset Serving**: Express serves built frontend assets in production
 - **API Routes**: Express handles `/api/*` routes for backend functionality
-- **Database Migrations**: `db:push` command deploys schema changes
+- **Database Management**: Supabase dashboard and client library
 
 ### Development Features
 - **Hot Module Replacement**: Vite HMR for rapid development
@@ -128,17 +129,12 @@ Preferred communication style: Simple, everyday language.
 - Conducted full PRD gap analysis identifying 60-70% missing critical requirements
 - Installed essential packages: resend, multer, sharp, node-cron, rate-limiter-flexible, bad-words, @sendgrid/mail
 - Created 8 core infrastructure modules: email service, content moderation, social media integration, file uploads, action assignments
-- Expanded database schema with 8+ new tables: action_assignments, moderation_queue, email_templates, email_logs, social_media_accounts, reports, notifications, verification_proofs
-- Added comprehensive API endpoints for all new functionality (30+ new routes)
-- Built assignment workflow system with proof submission and automated verification
-- Implemented content moderation system with profanity filtering and manual review queue  
-- Created social media account linking system with API integration framework
-- Added email notification system with templating (Resend/SendGrid ready)
-- Built comprehensive file upload system with image processing and validation
-- Created profile management page with social media account integration
-- Enhanced admin dashboard with full moderation capabilities and user management
-- Added assignment cards component for provider workflow management
-- Implemented reports system for community moderation
-- Enhanced Paystack payment integration with proper initialization and verification flow
-- Updated database with sample data for testing (buyer@test.com, provider@test.com, admin@engagemarket.com - password: test123)
-- **Status: 90%+ PRD compliance achieved - major feature implementation complete**
+- **DATABASE MIGRATION: Replaced Drizzle ORM with Supabase Client**
+- Removed all Drizzle ORM dependencies and configuration
+- Updated all database operations to use Supabase client
+- Replaced schema definitions with TypeScript interfaces
+- Updated authentication to use Supabase Auth
+- Migrated all CRUD operations to Supabase client calls
+- Removed direct PostgreSQL connections and Drizzle migrations
+- Updated package.json to remove Drizzle-related dependencies
+- **COMPLETED MIGRATION**: All database operations now use Supabase exclusively
