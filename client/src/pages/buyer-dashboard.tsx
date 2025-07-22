@@ -295,72 +295,72 @@ export default function BuyerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="flex">
+      <div className="flex flex-col lg:flex-row">
         {/* Sidebar */}
-        <div className="w-64 bg-white shadow-sm min-h-screen">
-          <div className="p-6">
-            <h2 className="text-xl font-bold text-primary">Buyer Dashboard</h2>
-            <p className="text-sm text-gray-600 mt-1">Welcome, {user?.name}</p>
+        <div className="w-full lg:w-64 bg-white shadow-sm min-h-screen lg:min-h-0">
+          <div className="p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-bold text-primary">Buyer Dashboard</h2>
+            <p className="text-xs sm:text-sm text-gray-600 mt-1">Welcome, {user?.name}</p>
           </div>
           
-          <nav className="mt-6">
+          <nav className="mt-4 sm:mt-6">
             <button
               onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center px-6 py-3 text-left ${
+              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
                 activeTab === "overview" 
                   ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <i className="fas fa-chart-line mr-3"></i>
+              <i className="fas fa-chart-line mr-2 sm:mr-3"></i>
               Overview
             </button>
             
             <button
               onClick={() => setActiveTab("browse")}
-              className={`w-full flex items-center px-6 py-3 text-left ${
+              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
                 activeTab === "browse" 
                   ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <i className="fas fa-shopping-cart mr-3"></i>
+              <i className="fas fa-shopping-cart mr-2 sm:mr-3"></i>
               Browse Services
             </button>
             
             <button
               onClick={() => setActiveTab("orders")}
-              className={`w-full flex items-center px-6 py-3 text-left ${
+              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
                 activeTab === "orders" 
                   ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <i className="fas fa-clipboard-list mr-3"></i>
+              <i className="fas fa-clipboard-list mr-2 sm:mr-3"></i>
               Orders & Assignments
             </button>
             
             <button
               onClick={logout}
-              className="w-full flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 text-left"
+              className="w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-gray-600 hover:bg-gray-100 text-left text-sm sm:text-base"
             >
-              <i className="fas fa-sign-out-alt mr-3"></i>
+              <i className="fas fa-sign-out-alt mr-2 sm:mr-3"></i>
               Logout
             </button>
           </nav>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-8">
+        <div className="flex-1 p-4 sm:p-6 lg:p-8">
           {activeTab === "overview" && (
             <>
-              <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Buyer Overview</h1>
-                <p className="text-gray-600">Welcome back! Here's your marketplace summary</p>
+              <div className="mb-6 sm:mb-8">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Buyer Overview</h1>
+                <p className="text-sm sm:text-base text-gray-600">Welcome back! Here's your marketplace summary</p>
               </div>
 
               {/* Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
                 <Card>
                   <CardContent className="p-6">
                     <div className="flex items-center">

@@ -185,112 +185,115 @@ export default function ProviderDashboard() {
     .filter((a: any) => a.status === 'assigned' || a.status === 'in_progress')
     .reduce((sum: number, a: any) => sum + 2.00, 0);
 
+  const availableBalance = user?.balance || 0;
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="flex">
+      <div className="flex flex-col lg:flex-row">
         {/* Sidebar */}
-        <div className="w-64 bg-white shadow-sm min-h-screen">
-          <div className="p-6">
-            <h2 className="text-xl font-bold text-primary">Provider Dashboard</h2>
-            <p className="text-sm text-gray-600 mt-1">Welcome, {user?.name}</p>
+        <div className="w-full lg:w-64 bg-white shadow-sm min-h-screen lg:min-h-0">
+          <div className="p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-bold text-primary">Provider Dashboard</h2>
+            <p className="text-xs sm:text-sm text-gray-600 mt-1">Welcome, {user?.name}</p>
+            
             <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                              <div className="text-lg font-bold text-green-700">
-                  {Number(user?.balance || 0).toFixed(2)} KES
-                </div>
-              <div className="text-sm text-green-600">Available Balance</div>
+              <div className="text-lg sm:text-xl font-bold text-green-600">
+                {availableBalance.toFixed(2)} KES
+              </div>
+              <div className="text-xs sm:text-sm text-green-600">Available Balance</div>
             </div>
           </div>
           
-          <nav className="mt-6">
+          <nav className="mt-4 sm:mt-6">
             <button
               onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center px-6 py-3 text-left ${
+              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
                 activeTab === "overview" 
                   ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <i className="fas fa-chart-line mr-3"></i>
+              <i className="fas fa-chart-line mr-2 sm:mr-3"></i>
               Overview
             </button>
             
             <button
               onClick={() => setActiveTab("services")}
-              className={`w-full flex items-center px-6 py-3 text-left ${
+              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
                 activeTab === "services" 
                   ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <i className="fas fa-cog mr-3"></i>
+              <i className="fas fa-cog mr-2 sm:mr-3"></i>
               My Services
             </button>
             
             <button
               onClick={() => setActiveTab("service-selection")}
-              className={`w-full flex items-center px-6 py-3 text-left ${
+              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
                 activeTab === "service-selection" 
                   ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <i className="fas fa-check-square mr-3"></i>
+              <i className="fas fa-check-square mr-2 sm:mr-3"></i>
               Service Selection
             </button>
             
             <button
               onClick={() => setActiveTab("orders")}
-              className={`w-full flex items-center px-6 py-3 text-left ${
+              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
                 activeTab === "orders" 
                   ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <i className="fas fa-clipboard-list mr-3"></i>
+              <i className="fas fa-clipboard-list mr-2 sm:mr-3"></i>
               Orders
             </button>
             
             <button
               onClick={() => setActiveTab("ai-reverification")}
-              className={`w-full flex items-center px-6 py-3 text-left ${
+              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
                 activeTab === "ai-reverification" 
                   ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <i className="fas fa-robot mr-3"></i>
+              <i className="fas fa-robot mr-2 sm:mr-3"></i>
               AI Re-verification
             </button>
             
             <button
               onClick={() => setActiveTab("earnings")}
-              className={`w-full flex items-center px-6 py-3 text-left ${
+              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
                 activeTab === "earnings" 
                   ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <i className="fas fa-wallet mr-3"></i>
+              <i className="fas fa-wallet mr-2 sm:mr-3"></i>
               Wallet
             </button>
             
             <button
               onClick={logout}
-              className="w-full flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 text-left"
+              className="w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-gray-600 hover:bg-gray-100 text-left text-sm sm:text-base"
             >
-              <i className="fas fa-sign-out-alt mr-3"></i>
+              <i className="fas fa-sign-out-alt mr-2 sm:mr-3"></i>
               Logout
             </button>
           </nav>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-8">
+        <div className="flex-1 p-4 sm:p-6 lg:p-8">
           {activeTab === "overview" && (
             <div>
-              <h1 className="text-3xl font-bold mb-8">Provider Overview</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">Provider Overview</h1>
               
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
                 <Card>
                   <CardContent className="p-6">
                     <div className="flex items-center">
@@ -348,19 +351,19 @@ export default function ProviderDashboard() {
                 </Card>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 <Card>
-                  <CardContent className="p-6">
-                    <h3 className="text-lg font-semibold mb-4">Recent Actions</h3>
+                  <CardContent className="p-4 sm:p-6">
+                    <h3 className="text-base sm:text-lg font-semibold mb-4">Recent Actions</h3>
                     <div className="space-y-3">
                       {actionAssignments.slice(0, 5).map((assignment: any) => (
                         <div key={assignment.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                           <div>
-                            <p className="font-medium">Action #{assignment.id}</p>
-                            <p className="text-sm text-gray-600">1 {assignment.actionType} for {assignment.platform}</p>
+                            <p className="font-medium text-sm sm:text-base">Action #{assignment.id}</p>
+                            <p className="text-xs sm:text-sm text-gray-600">1 {assignment.actionType} for {assignment.platform}</p>
                           </div>
                           <div className="text-right">
-                            <p className="font-medium text-green-600">2.00 KES</p>
+                            <p className="font-medium text-green-600 text-sm sm:text-base">2.00 KES</p>
                             <span className={`text-xs px-2 py-1 rounded-full ${
                               assignment.status === 'completed' ? 'bg-green-100 text-green-600' :
                               assignment.status === 'in_progress' ? 'bg-blue-100 text-blue-600' :
@@ -377,20 +380,21 @@ export default function ProviderDashboard() {
                 </Card>
 
                 <Card>
-                  <CardContent className="p-6">
-                    <h3 className="text-lg font-semibold mb-4">Quick Withdrawal</h3>
+                  <CardContent className="p-4 sm:p-6">
+                    <h3 className="text-base sm:text-lg font-semibold mb-4">Quick Withdrawal</h3>
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor="withdrawal-amount">Withdrawal Amount (KES)</Label>
+                        <Label htmlFor="withdrawal-amount" className="text-sm sm:text-base">Withdrawal Amount (KES)</Label>
                         <Input
                           id="withdrawal-amount"
                           type="number"
                           placeholder="Enter amount"
                           value={withdrawalAmount}
                           onChange={(e) => setWithdrawalAmount(e.target.value)}
+                          className="mt-1"
                         />
                         {withdrawalAmount && (
-                          <div className="mt-2 text-sm text-gray-600">
+                          <div className="mt-2 text-xs sm:text-sm text-gray-600">
                             <p>Fee: {calculateWithdrawalFee(parseFloat(withdrawalAmount)).fee.toFixed(2)} KES</p>
                             <p>You'll receive: {calculateWithdrawalFee(parseFloat(withdrawalAmount)).netAmount.toFixed(2)} KES</p>
                           </div>
@@ -399,7 +403,7 @@ export default function ProviderDashboard() {
                       <Button 
                         onClick={handleWithdrawal}
                         disabled={requestWithdrawalMutation.isPending || !withdrawalAmount}
-                        className="w-full"
+                        className="w-full text-sm sm:text-base"
                       >
                         Request Withdrawal
                       </Button>
@@ -412,8 +416,8 @@ export default function ProviderDashboard() {
 
           {activeTab === "services" && (
             <div>
-              <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold">Available Services</h1>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
+                <h1 className="text-2xl sm:text-3xl font-bold">Available Services</h1>
                 <Button 
                   onClick={() => {
                     // Save selected services to backend
@@ -425,7 +429,7 @@ export default function ProviderDashboard() {
                         toast({ title: "Error", description: "Failed to update services", variant: "destructive" });
                       });
                   }}
-                  className="bg-primary hover:bg-primary-dark"
+                  className="bg-primary hover:bg-primary-dark text-sm sm:text-base w-full sm:w-auto"
                   disabled={selectedServices.length === 0}
                 >
                   <i className="fas fa-save mr-2"></i>
@@ -433,7 +437,7 @@ export default function ProviderDashboard() {
                 </Button>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {allServices.map((service: any) => (
                   <Card 
                     key={service.id} 

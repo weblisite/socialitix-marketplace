@@ -145,31 +145,31 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 sm:py-6 gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-              <p className="text-gray-600">Platform overview and analytics</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+              <p className="text-sm sm:text-base text-gray-600">Platform overview and analytics</p>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
-              <Button variant="outline" onClick={logout}>
+              <span className="text-xs sm:text-sm text-gray-600">Welcome, {user?.name}</span>
+              <Button variant="outline" onClick={logout} className="text-sm">
                 Logout
               </Button>
             </div>
           </div>
         </div>
-              </div>
+      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Total Revenue</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(stats?.total_revenue || 0)}</div>
+              <div className="text-xl sm:text-2xl font-bold">{formatCurrency(stats?.total_revenue || 0)}</div>
               <p className="text-xs text-muted-foreground">
                 All time platform earnings
               </p>
@@ -178,79 +178,79 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Total Users</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.total_users || 0}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats?.total_users || 0}</div>
               <p className="text-xs text-muted-foreground">
                 {stats?.total_providers || 0} providers, {stats?.total_buyers || 0} buyers
               </p>
             </CardContent>
           </Card>
 
-                <Card>
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed Services</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Completed Services</CardTitle>
               <ShoppingCart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.completed_services || 0}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats?.completed_services || 0}</div>
               <p className="text-xs text-muted-foreground">
                 {stats?.total_transactions || 0} total transactions
               </p>
-                  </CardContent>
-                </Card>
+            </CardContent>
+          </Card>
 
-                <Card>
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Verifications</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Pending Verifications</CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.pending_verifications || 0}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats?.pending_verifications || 0}</div>
               <p className="text-xs text-muted-foreground">
                 Awaiting verification
               </p>
             </CardContent>
           </Card>
-                      </div>
+        </div>
 
         {/* Revenue Trends */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Today's Revenue</CardTitle>
+              <CardTitle className="text-sm sm:text-lg">Today's Revenue</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-green-600">
+              <div className="text-2xl sm:text-3xl font-bold text-green-600">
                 {formatCurrency(stats?.revenue_today || 0)}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">This Week</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-blue-600">
-                {formatCurrency(stats?.revenue_this_week || 0)}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">This Month</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-purple-600">
-                {formatCurrency(stats?.revenue_this_month || 0)}
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm sm:text-lg">This Week</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl sm:text-3xl font-bold text-blue-600">
+                {formatCurrency(stats?.revenue_this_week || 0)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm sm:text-lg">This Month</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl sm:text-3xl font-bold text-purple-600">
+                {formatCurrency(stats?.revenue_this_month || 0)}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="revenue" className="space-y-6">
