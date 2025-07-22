@@ -279,8 +279,8 @@ export async function logPlatformRevenue(
   quantity: number
 ): Promise<void> {
   try {
-    // Calculate platform revenue (3 KES per quantity)
-    const platformRevenue = 3.00 * quantity;
+    // Calculate platform revenue (5 KES per quantity - 10 KES buyer price - 5 KES provider price)
+    const platformRevenue = 5.00 * quantity;
     
     // Log platform revenue
     await supabase.from('platform_revenue').insert([{

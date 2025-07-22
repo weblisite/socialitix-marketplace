@@ -1,38 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth.tsx";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { useLocation, Link } from "wouter";
-import { calculateWithdrawalFee } from "@/lib/paystack";
-import AssignmentCard from "@/components/assignment-card";
-import ContentValidator from "@/components/content-validator";
-import { AIReVerificationRequest } from "@/components/ai-reverification-request";
-import { WalletDashboard } from "@/components/wallet-dashboard";
-
-function AIReVerificationSection() {
-  const { data: rejectedAssignments = [], refetch } = useQuery({
-    queryKey: ['/api/provider/rejected-assignments'],
-  });
-
-  const handleReVerificationComplete = () => {
-    refetch();
-  };
-
-  return (
-    <AIReVerificationRequest
-      rejectedAssignments={rejectedAssignments}
-      onReVerificationComplete={handleReVerificationComplete}
-    />
-  );
-}
+import { apiRequest, getQueryFn } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 
 export default function ProviderDashboard() {
   const { user, logout } = useAuth();
@@ -40,673 +16,706 @@ export default function ProviderDashboard() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("overview");
-  const [serviceModalOpen, setServiceModalOpen] = useState(false);
-  const [withdrawalAmount, setWithdrawalAmount] = useState("");
-  const [assignmentFilter, setAssignmentFilter] = useState("all");
-  const [contentValidator, setContentValidator] = useState({ open: false, content: '', contentType: 'description' as const });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
+  const [proofModal, setProofModal] = useState({
+    open: false,
+    assignmentId: 0,
+    proofUrl: '',
+    proofType: 'screenshot' as 'screenshot' | 'manual'
+  });
 
-  // Redirect if not provider - only redirect if we have user data and they're not a provider
+  // Fetch provider assignments
+  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery({
+    queryKey: ['/api/provider/assignments'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/provider/assignments');
+      return response.json();
+    },
+  });
+
+  // Fetch provider services
+  const { data: providerServices = [] } = useQuery({
+    queryKey: ['/api/provider/services'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/provider/services');
+      return response.json();
+    },
+  });
+
+  // Fetch transactions
+  const { data: transactions = [] } = useQuery({
+    queryKey: ["/api/transactions"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  }) as { data: any[] };
+
+  // Fetch withdrawals
+  const { data: withdrawals = [] } = useQuery({
+    queryKey: ['/api/withdrawals'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/withdrawals');
+      return response.json();
+    },
+  });
+
+  // Start assignment mutation
+  const startAssignmentMutation = useMutation({
+    mutationFn: async (assignmentId: number) => {
+      const response = await apiRequest('POST', `/api/assignments/${assignmentId}/start`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/provider/assignments'] });
+      toast({
+        title: "Assignment started!",
+        description: "You can now work on this assignment.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start assignment",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Submit proof mutation
+  const submitProofMutation = useMutation({
+    mutationFn: async ({ assignmentId, proofUrl, proofType }: { assignmentId: number; proofUrl: string; proofType: string }) => {
+      const response = await apiRequest('POST', `/api/assignments/${assignmentId}/submit-proof`, {
+        proof_url: proofUrl,
+        proof_type: proofType,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/provider/assignments'] });
+      setProofModal({ open: false, assignmentId: 0, proofUrl: '', proofType: 'screenshot' });
+      toast({
+        title: "Proof submitted!",
+        description: "Your proof has been submitted for verification.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit proof",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Redirect if not provider
   if (user && user.role !== 'provider') {
     setLocation('/');
     return null;
   }
 
-  // Fetch services from provider-specific API endpoint
-  const { data: allServices = [] } = useQuery({
-    queryKey: ['/api/services/provider-view'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/services/provider-view');
-      return response.json();
-    },
-  });
-
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
-
-  const { data: transactions = [] } = useQuery({
-    queryKey: ['/api/transactions'],
-  });
-
-  const { data: withdrawals = [] } = useQuery({
-    queryKey: ['/api/withdrawals'],
-  });
-
-  const { data: actionAssignments = [], refetch: refetchActionAssignments } = useQuery({
-    queryKey: ['/api/action-assignments'],
-  });
-
-  const { data: providerServices = [], refetch: refetchProviderServices } = useQuery({
-    queryKey: ['/api/provider-services'],
-  });
-
-  const createServiceMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest('POST', '/api/services', data);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/services/provider'] });
-      setServiceModalOpen(false);
-      toast({ title: "Success", description: "Service created successfully" });
-    },
-  });
-
-  const requestWithdrawalMutation = useMutation({
-    mutationFn: async (amount: string) => {
-      const res = await apiRequest('POST', '/api/withdrawals', { amount });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/withdrawals'] });
-      setWithdrawalAmount("");
-      toast({ title: "Success", description: "Withdrawal request submitted" });
-    },
-  });
-
-  const completeActionMutation = useMutation({
-    mutationFn: async (assignmentId: number) => {
-      const res = await apiRequest('PATCH', `/api/action-assignments/${assignmentId}`, { 
-        status: 'completed' 
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/action-assignments'] });
-      toast({ title: "Success", description: "Action marked as completed" });
-    },
-  });
-
-  const handleCompleteAction = (assignmentId: number) => {
-    completeActionMutation.mutate(assignmentId);
+  const platformIcons: Record<string, string> = {
+    instagram: "fab fa-instagram text-pink-500",
+    youtube: "fab fa-youtube text-red-500",
+    twitter: "fab fa-twitter text-blue-500",
+    tiktok: "fab fa-tiktok text-black",
+    facebook: "fab fa-facebook text-blue-600",
   };
 
-  const handleServiceSelection = async (service: any, isSelected: boolean) => {
-    try {
-      if (isSelected) {
-        // Remove service
-        const providerService = providerServices.find((ps: any) => 
-          ps.platform === service.platform && ps.actionType === service.type
-        );
-        if (providerService) {
-          await apiRequest('DELETE', `/api/provider-services/${providerService.id}`);
-        }
-      } else {
-        // Add service
-        await apiRequest('POST', '/api/provider-services', {
-          platform: service.platform,
-          actionType: service.type,
-          isActive: true
-        });
-      }
-      
-      refetchProviderServices();
-      toast({ 
-        title: "Success", 
-        description: isSelected ? "Service removed" : "Service added" 
-      });
-    } catch (error) {
-      toast({ 
-        title: "Error", 
-        description: "Failed to update service selection", 
-        variant: "destructive" 
-      });
-    }
+  const handleStartAssignment = (assignmentId: number) => {
+    startAssignmentMutation.mutate(assignmentId);
   };
 
-  const handleCreateService = (formData: FormData) => {
-    const data = {
-      type: formData.get('type'),
-      platform: formData.get('platform'),
-      description: formData.get('description'),
-    };
-    createServiceMutation.mutate(data);
-  };
-
-  const handleWithdrawal = () => {
-    const amount = parseFloat(withdrawalAmount);
-    if (isNaN(amount) || amount <= 0) {
-      toast({ title: "Invalid amount", description: "Please enter a valid amount", variant: "destructive" });
+  const handleSubmitProof = () => {
+    if (!proofModal.proofUrl.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide a proof URL",
+        variant: "destructive",
+      });
       return;
     }
-
-    const { fee, netAmount } = calculateWithdrawalFee(amount);
-    if (netAmount <= 0) {
-      toast({ title: "Amount too small", description: "Amount is too small after fees", variant: "destructive" });
-      return;
-    }
-
-    requestWithdrawalMutation.mutate(withdrawalAmount);
+    
+    submitProofMutation.mutate({
+      assignmentId: proofModal.assignmentId,
+      proofUrl: proofModal.proofUrl,
+      proofType: proofModal.proofType,
+    });
   };
 
-  const totalEarnings = actionAssignments
-    .filter((a: any) => a.status === 'completed')
-    .reduce((sum: number, a: any) => sum + 2.00, 0);
-
-  const pendingEarnings = actionAssignments
-    .filter((a: any) => a.status === 'assigned' || a.status === 'in_progress')
-    .reduce((sum: number, a: any) => sum + 2.00, 0);
-
-  const availableBalance = user?.balance || 0;
+  const openProofModal = (assignment: any) => {
+    setSelectedAssignment(assignment);
+    setProofModal({
+      open: true,
+      assignmentId: assignment.id,
+      proofUrl: '',
+      proofType: 'screenshot'
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="flex flex-col lg:flex-row">
-        {/* Sidebar */}
-        <div className="w-full lg:w-64 bg-white shadow-sm min-h-screen lg:min-h-0">
-          <div className="p-4 sm:p-6">
-            <h2 className="text-lg sm:text-xl font-bold text-primary">Provider Dashboard</h2>
-            <p className="text-xs sm:text-sm text-gray-600 mt-1">Welcome, {user?.name}</p>
-            
-            <div className="mt-4 p-3 bg-green-50 rounded-lg">
-              <div className="text-lg sm:text-xl font-bold text-green-600">
-                {availableBalance.toFixed(2)} KES
-              </div>
-              <div className="text-xs sm:text-sm text-green-600">Available Balance</div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white">
+      {/* Mobile Header */}
+      <div className="lg:hidden bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 sticky top-0 z-50">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="mr-3 text-gray-300 hover:text-lime-500 hover:bg-gray-800"
+            >
+              <i className={`fas ${mobileMenuOpen ? 'fa-times' : 'fa-bars'} text-lg`}></i>
+            </Button>
+            <div>
+              <h2 className="text-lg font-bold bg-gradient-to-r from-lime-500 to-lime-400 bg-clip-text text-transparent">
+                Provider Dashboard
+              </h2>
+              <p className="text-xs text-white">Welcome, {user?.name}</p>
             </div>
           </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={logout}
+            className="border-gray-700 bg-gray-800 text-white hover:border-lime-500 hover:text-lime-500 hover:bg-gray-700"
+          >
+            <i className="fas fa-sign-out-alt mr-2"></i>
+            Logout
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-col lg:flex-row">
+        {/* Sidebar */}
+        <div className={`${mobileMenuOpen ? 'block' : 'hidden'} lg:block w-full lg:w-64 bg-gray-900/90 backdrop-blur-lg border-r border-gray-800 min-h-screen lg:min-h-0 lg:relative fixed lg:static top-0 left-0 z-40 lg:z-auto pt-16 lg:pt-0`}>
+          {/* Desktop Header */}
+          <div className="hidden lg:block p-6 border-b border-gray-800">
+            <h2 className="text-xl font-bold bg-gradient-to-r from-lime-500 to-lime-400 bg-clip-text text-transparent">
+              Provider Dashboard
+            </h2>
+            <p className="text-sm text-white mt-1">Welcome, {user?.name}</p>
+          </div>
           
-          <nav className="mt-4 sm:mt-6">
+          <nav className="mt-6 p-4">
             <button
-              onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
+              onClick={() => {
+                setActiveTab("overview");
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center px-4 py-3 text-left text-sm rounded-xl transition-all duration-200 ${
                 activeTab === "overview" 
-                  ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? "bg-gradient-to-r from-lime-500/20 to-lime-600/20 text-lime-400 border border-lime-500/30" 
+                  : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-300"
               }`}
             >
-              <i className="fas fa-chart-line mr-2 sm:mr-3"></i>
+              <i className="fas fa-chart-line mr-3 text-lg"></i>
               Overview
             </button>
             
             <button
-              onClick={() => setActiveTab("services")}
-              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
-                activeTab === "services" 
-                  ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
-                  : "text-gray-600 hover:bg-gray-100"
+              onClick={() => {
+                setActiveTab("assignments");
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center px-4 py-3 text-left text-sm rounded-xl transition-all duration-200 mt-2 ${
+                activeTab === "assignments" 
+                  ? "bg-gradient-to-r from-lime-500/20 to-lime-600/20 text-lime-400 border border-lime-500/30" 
+                  : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-300"
               }`}
             >
-              <i className="fas fa-cog mr-2 sm:mr-3"></i>
+              <i className="fas fa-tasks mr-3 text-lg"></i>
+              Available Assignments
+            </button>
+            
+            <button
+              onClick={() => {
+                setActiveTab("services");
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center px-4 py-3 text-left text-sm rounded-xl transition-all duration-200 mt-2 ${
+                activeTab === "services" 
+                  ? "bg-gradient-to-r from-lime-500/20 to-lime-600/20 text-lime-400 border border-lime-500/30" 
+                  : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-300"
+              }`}
+            >
+              <i className="fas fa-cog mr-3 text-lg"></i>
               My Services
             </button>
             
             <button
-              onClick={() => setActiveTab("service-selection")}
-              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
-                activeTab === "service-selection" 
-                  ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              <i className="fas fa-check-square mr-2 sm:mr-3"></i>
-              Service Selection
-            </button>
-            
-            <button
-              onClick={() => setActiveTab("orders")}
-              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
-                activeTab === "orders" 
-                  ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              <i className="fas fa-clipboard-list mr-2 sm:mr-3"></i>
-              Orders
-            </button>
-            
-            <button
-              onClick={() => setActiveTab("ai-reverification")}
-              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
-                activeTab === "ai-reverification" 
-                  ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              <i className="fas fa-robot mr-2 sm:mr-3"></i>
-              AI Re-verification
-            </button>
-            
-            <button
-              onClick={() => setActiveTab("earnings")}
-              className={`w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-left text-sm sm:text-base ${
+              onClick={() => {
+                setActiveTab("earnings");
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center px-4 py-3 text-left text-sm rounded-xl transition-all duration-200 mt-2 ${
                 activeTab === "earnings" 
-                  ? "text-gray-700 bg-gray-100 border-r-2 border-primary" 
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? "bg-gradient-to-r from-lime-500/20 to-lime-600/20 text-lime-400 border border-lime-500/30" 
+                  : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-300"
               }`}
             >
-              <i className="fas fa-wallet mr-2 sm:mr-3"></i>
-              Wallet
+              <i className="fas fa-coins mr-3 text-lg"></i>
+              Earnings
             </button>
             
             <button
               onClick={logout}
-              className="w-full flex items-center px-4 sm:px-6 py-2 sm:py-3 text-gray-600 hover:bg-gray-100 text-left text-sm sm:text-base"
+              className="w-full flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800/50 hover:text-gray-300 text-left text-sm rounded-xl transition-all duration-200 mt-2 lg:hidden"
             >
-              <i className="fas fa-sign-out-alt mr-2 sm:mr-3"></i>
+              <i className="fas fa-sign-out-alt mr-3 text-lg"></i>
               Logout
             </button>
           </nav>
         </div>
 
+        {/* Mobile Menu Overlay */}
+        {mobileMenuOpen && (
+          <div 
+            className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-30"
+            onClick={() => setMobileMenuOpen(false)}
+          ></div>
+        )}
+
         {/* Main Content */}
         <div className="flex-1 p-4 sm:p-6 lg:p-8">
           {activeTab === "overview" && (
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">Provider Overview</h1>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-                <Card>
+            <>
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold text-white mb-2">Provider Overview</h1>
+                <p className="text-gray-400">Monitor your performance and earnings</p>
+              </div>
+
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <Card className="bg-black/80 border-gray-800 hover:border-lime-500/30 transition-all duration-300">
                   <CardContent className="p-6">
-                    <div className="flex items-center">
-                      <div className="p-3 rounded-full bg-green-100">
-                        <i className="fas fa-dollar-sign text-green-600"></i>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-300 font-medium text-sm">Total Assignments</p>
+                        <p className="text-3xl font-bold text-white">{assignments.length}</p>
                       </div>
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-600">Total Earnings</p>
-                        <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} KES</p>
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                        <i className="fas fa-tasks text-white text-xl"></i>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-                
-                <Card>
+
+                <Card className="bg-black/80 border-gray-800 hover:border-lime-500/30 transition-all duration-300">
                   <CardContent className="p-6">
-                    <div className="flex items-center">
-                      <div className="p-3 rounded-full bg-yellow-100">
-                        <i className="fas fa-clock text-yellow-600"></i>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-300 font-medium text-sm">Total Earnings</p>
+                        <p className="text-3xl font-bold text-lime-500">
+                          {transactions?.reduce((sum: number, t: any) => sum + (t.provider_earnings || 0), 0).toFixed(2) || '0.00'} KES
+                        </p>
                       </div>
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-600">Pending</p>
-                        <p className="text-2xl font-bold">{pendingEarnings.toFixed(2)} KES</p>
+                      <div className="w-12 h-12 bg-gradient-to-br from-lime-500 to-lime-600 rounded-xl flex items-center justify-center">
+                        <i className="fas fa-coins text-white text-xl"></i>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-                
-                <Card>
+
+                <Card className="bg-black/80 border-gray-800 hover:border-lime-500/30 transition-all duration-300">
                   <CardContent className="p-6">
-                    <div className="flex items-center">
-                      <div className="p-3 rounded-full bg-blue-100">
-                        <i className="fas fa-list text-blue-600"></i>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-300 font-medium text-sm">Active Tasks</p>
+                        <p className="text-3xl font-bold text-yellow-500">
+                          {assignments?.filter((a: any) => a.status === 'in_progress').length || 0}
+                        </p>
                       </div>
-                                              <div className="ml-4">
-                          <p className="text-sm font-medium text-gray-600">Active Services</p>
-                          <p className="text-2xl font-bold">{selectedServices.length}</p>
-                        </div>
+                      <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center">
+                        <i className="fas fa-clock text-white text-xl"></i>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
-                
-                <Card>
+
+                <Card className="bg-black/80 border-gray-800 hover:border-lime-500/30 transition-all duration-300">
                   <CardContent className="p-6">
-                    <div className="flex items-center">
-                      <div className="p-3 rounded-full bg-purple-100">
-                        <i className="fas fa-shopping-cart text-purple-600"></i>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-300 font-medium text-sm">Completed</p>
+                        <p className="text-3xl font-bold text-green-500">
+                          {assignments?.filter((a: any) => a.status === 'completed').length || 0}
+                        </p>
                       </div>
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-600">Total Actions</p>
-                        <p className="text-2xl font-bold">{actionAssignments.length}</p>
+                      <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                        <i className="fas fa-check-circle text-white text-xl"></i>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                <Card>
-                  <CardContent className="p-4 sm:p-6">
-                    <h3 className="text-base sm:text-lg font-semibold mb-4">Recent Actions</h3>
-                    <div className="space-y-3">
-                      {actionAssignments.slice(0, 5).map((assignment: any) => (
-                        <div key={assignment.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                          <div>
-                            <p className="font-medium text-sm sm:text-base">Action #{assignment.id}</p>
-                            <p className="text-xs sm:text-sm text-gray-600">1 {assignment.actionType} for {assignment.platform}</p>
+              {/* Recent Activity */}
+              <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800">
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-semibold text-white mb-4">Recent Activity</h3>
+                  {!assignments || assignments.length === 0 ? (
+                    <div className="text-center py-8">
+                      <i className="fas fa-tasks text-4xl text-gray-600 mb-4"></i>
+                      <p className="text-gray-400">No assignments yet. Check the Available Assignments tab!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {assignments.slice(0, 5).map((assignment: any) => (
+                        <div key={assignment.id} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-lime-500 to-lime-600 rounded-lg flex items-center justify-center">
+                              <i className="fas fa-tasks text-white"></i>
+                            </div>
+                            <div>
+                              <p className="text-white font-medium capitalize">
+                                {assignment.platform} {assignment.action_type}
+                              </p>
+                              <p className="text-gray-400 text-sm">
+                                {new Date(assignment.assigned_at).toLocaleDateString()}
+                              </p>
+                            </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-medium text-green-600 text-sm sm:text-base">2.00 KES</p>
+                            <p className="text-lime-500 font-semibold">5.00 KES</p>
                             <span className={`text-xs px-2 py-1 rounded-full ${
-                              assignment.status === 'completed' ? 'bg-green-100 text-green-600' :
-                              assignment.status === 'in_progress' ? 'bg-blue-100 text-blue-600' :
-                              assignment.status === 'assigned' ? 'bg-yellow-100 text-yellow-600' :
-                              'bg-red-100 text-red-600'
+                              assignment.status === 'completed' 
+                                ? 'bg-green-500/20 text-green-400' 
+                                : assignment.status === 'in_progress'
+                                ? 'bg-yellow-500/20 text-yellow-400'
+                                : 'bg-gray-500/20 text-gray-400'
                             }`}>
-                              {assignment.status.replace('_', ' ')}
+                              {assignment.status}
                             </span>
                           </div>
                         </div>
                       ))}
                     </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-4 sm:p-6">
-                    <h3 className="text-base sm:text-lg font-semibold mb-4">Quick Withdrawal</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="withdrawal-amount" className="text-sm sm:text-base">Withdrawal Amount (KES)</Label>
-                        <Input
-                          id="withdrawal-amount"
-                          type="number"
-                          placeholder="Enter amount"
-                          value={withdrawalAmount}
-                          onChange={(e) => setWithdrawalAmount(e.target.value)}
-                          className="mt-1"
-                        />
-                        {withdrawalAmount && (
-                          <div className="mt-2 text-xs sm:text-sm text-gray-600">
-                            <p>Fee: {calculateWithdrawalFee(parseFloat(withdrawalAmount)).fee.toFixed(2)} KES</p>
-                            <p>You'll receive: {calculateWithdrawalFee(parseFloat(withdrawalAmount)).netAmount.toFixed(2)} KES</p>
-                          </div>
-                        )}
-                      </div>
-                      <Button 
-                        onClick={handleWithdrawal}
-                        disabled={requestWithdrawalMutation.isPending || !withdrawalAmount}
-                        className="w-full text-sm sm:text-base"
-                      >
-                        Request Withdrawal
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
           )}
 
-          {activeTab === "services" && (
-            <div>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
-                <h1 className="text-2xl sm:text-3xl font-bold">Available Services</h1>
-                <Button 
-                  onClick={() => {
-                    // Save selected services to backend
-                    apiRequest('POST', '/api/provider/services', { serviceIds: selectedServices })
-                      .then(() => {
-                        toast({ title: "Success", description: "Services updated successfully" });
-                      })
-                      .catch(() => {
-                        toast({ title: "Error", description: "Failed to update services", variant: "destructive" });
-                      });
-                  }}
-                  className="bg-primary hover:bg-primary-dark text-sm sm:text-base w-full sm:w-auto"
-                  disabled={selectedServices.length === 0}
-                >
-                  <i className="fas fa-save mr-2"></i>
-                  Save Selection ({selectedServices.length} selected)
-                </Button>
+          {activeTab === "assignments" && (
+            <>
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold text-white mb-2">Available Assignments</h1>
+                <p className="text-gray-400">Complete tasks to earn money</p>
               </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                {allServices.map((service: any) => (
-                  <Card 
-                    key={service.id} 
-                    className={`cursor-pointer transition-all ${
-                      selectedServices.includes(service.id) 
-                        ? 'ring-2 ring-primary bg-primary/5' 
-                        : 'hover:shadow-md'
-                    }`}
-                    onClick={() => {
-                      setSelectedServices(prev => 
-                        prev.includes(service.id)
-                          ? prev.filter(id => id !== service.id)
-                          : [...prev, service.id]
-                      );
-                    }}
-                  >
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center">
-                          <i className={`${service.icon} text-xl mr-2`}></i>
-                          <span className="text-sm font-medium text-gray-600 capitalize">{service.platform}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            selectedServices.includes(service.id) 
-                              ? 'bg-primary text-white' 
-                              : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {selectedServices.includes(service.id) ? 'Selected' : 'Available'}
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={selectedServices.includes(service.id)}
-                            onChange={() => {}} // Handled by card click
-                            className="w-4 h-4 text-primary"
-                          />
-                        </div>
-                      </div>
-                      
-                      <h3 className="text-lg font-semibold mb-2">
-                        {service.name}
-                      </h3>
-                      <p className="text-gray-600 text-sm mb-4">{service.providerDescription}</p>
-                      
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Your Earnings:</span>
-                          <span className="font-semibold text-green-600">{service.providerPrice.toFixed(2)} KES</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Delivery:</span>
-                          <span>{service.deliveryTime}</span>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-4 pt-4 border-t">
-                        <div className="text-xs text-gray-500 mb-2">Requirements:</div>
-                        <ul className="text-xs text-gray-600 space-y-1">
-                          {service.requirements.map((req, index) => (
-                            <li key={index} className="flex items-center">
-                              <i className="fas fa-check text-green-500 mr-2 text-xs"></i>
-                              {req}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {activeTab === "service-selection" && (
-            <div>
-              <h1 className="text-3xl font-bold mb-8">Select Services to Offer</h1>
-              
-              <div className="mb-6">
-                <p className="text-gray-600 mb-4">
-                  Select which services you want to offer. You'll only receive orders for services you've selected.
-                  The system will prioritize providers with better performance history.
-                </p>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {allServices.map((service: any) => {
-                  const isSelected = providerServices.some((ps: any) => 
-                    ps.platform === service.platform && ps.actionType === service.type
-                  );
-                  
-                  return (
-                    <Card 
-                      key={service.id} 
-                      className={`cursor-pointer transition-all ${
-                        isSelected 
-                          ? 'ring-2 ring-primary bg-primary/5' 
-                          : 'hover:shadow-md'
-                      }`}
-                      onClick={() => handleServiceSelection(service, isSelected)}
-                    >
+              {assignmentsLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <Card key={i} className="bg-gray-900/50 border-gray-800 animate-pulse">
                       <CardContent className="p-6">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center">
-                            <i className={`${service.icon} text-xl mr-2`}></i>
-                            <span className="text-sm font-medium text-gray-600 capitalize">{service.platform}</span>
+                        <div className="space-y-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-12 h-12 bg-gray-700 rounded-xl"></div>
+                            <div className="flex-1">
+                              <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+                              <div className="h-3 bg-gray-700 rounded w-1/2 mt-2"></div>
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                              isSelected 
-                                ? 'bg-primary text-white' 
-                                : 'bg-gray-100 text-gray-600'
-                            }`}>
-                              {isSelected ? 'Selected' : 'Available'}
-                            </span>
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => {}} // Handled by card click
-                              className="w-4 h-4 text-primary"
-                            />
-                          </div>
-                        </div>
-                        
-                        <h3 className="text-lg font-semibold mb-2">
-                          {service.name}
-                        </h3>
-                        <p className="text-gray-600 text-sm mb-4">{service.providerDescription}</p>
-                        
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span>Your Earnings:</span>
-                            <span className="font-semibold text-green-600">2.00 KES</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Platform:</span>
-                            <span className="capitalize">{service.platform}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Action Type:</span>
-                            <span className="capitalize">{service.type}</span>
+                          <div className="space-y-2">
+                            <div className="h-3 bg-gray-700 rounded"></div>
+                            <div className="h-3 bg-gray-700 rounded w-2/3"></div>
                           </div>
                         </div>
                       </CardContent>
                     </Card>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {activeTab === "orders" && (
-            <div>
-              <h1 className="text-3xl font-bold mb-8">Action Assignments</h1>
-              
-              <Card>
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    {actionAssignments.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <i className="fas fa-clipboard-list text-4xl mb-4"></i>
-                        <p>No action assignments yet</p>
-                        <p className="text-sm mt-2">You'll see individual actions here when buyers purchase services you offer</p>
-                      </div>
-                    ) : (
-                      actionAssignments.map((assignment: any) => (
-                        <div key={assignment.id} className="p-4 border rounded-lg">
-                          <div className="flex justify-between items-start mb-3">
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {assignments.filter((a: any) => a.status === 'assigned').map((assignment: any) => (
+                    <Card key={assignment.id} className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800 hover:border-lime-500/30 transition-all duration-300 group">
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-12 h-12 bg-gradient-to-br from-lime-500 to-lime-600 rounded-xl flex items-center justify-center shadow-lg">
+                              <i className={`${platformIcons[assignment.platform]} text-xl text-white`}></i>
+                            </div>
                             <div>
-                              <h3 className="font-semibold">Action #{assignment.id}</h3>
-                              <p className="text-sm text-gray-600">
-                                1 {assignment.actionType} for {assignment.platform}
+                              <h3 className="text-lg font-semibold text-white capitalize">
+                                {assignment.platform} {assignment.action_type}
+                              </h3>
+                              <p className="text-gray-400 text-sm">Assignment #{assignment.id}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-lime-500">5.00 KES</div>
+                            <div className="text-gray-400 text-sm">per action</div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Target URL</label>
+                            <p className="text-sm text-gray-400 break-all bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                              {assignment.target_url}
+                            </p>
+                          </div>
+
+                          {assignment.comment_text && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-300 mb-2">Instructions</label>
+                              <p className="text-sm text-gray-400 bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                                {assignment.comment_text}
                               </p>
                             </div>
-                            <span className={`px-3 py-1 rounded-full text-xs ${
-                              assignment.status === 'completed' ? 'bg-green-100 text-green-600' :
-                              assignment.status === 'in_progress' ? 'bg-blue-100 text-blue-600' :
-                              assignment.status === 'assigned' ? 'bg-yellow-100 text-yellow-600' :
-                              'bg-red-100 text-red-600'
-                            }`}>
-                              {assignment.status.replace('_', ' ')}
+                          )}
+
+                          <div className="flex items-center justify-between pt-4 border-t border-gray-800">
+                            <div className="text-sm text-gray-400">
+                              Assigned: {new Date(assignment.assigned_at).toLocaleDateString()}
+                            </div>
+                            <div className="space-x-2">
+                              <Button
+                                onClick={() => handleStartAssignment(assignment.id)}
+                                disabled={startAssignmentMutation.isPending}
+                                className="bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700 text-white font-semibold px-4 py-2 rounded-xl shadow-lg hover:shadow-lime-500/25 transition-all duration-300"
+                              >
+                                {startAssignmentMutation.isPending ? (
+                                  <i className="fas fa-spinner fa-spin mr-2"></i>
+                                ) : (
+                                  <i className="fas fa-play mr-2"></i>
+                                )}
+                                Start Task
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {assignments.filter((a: any) => a.status === 'assigned').length === 0 && !assignmentsLoading && (
+                <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800">
+                  <CardContent className="p-8 text-center">
+                    <i className="fas fa-tasks text-4xl text-gray-600 mb-4"></i>
+                    <h3 className="text-xl font-semibold text-white mb-2">No Available Assignments</h3>
+                    <p className="text-gray-400">Check back later for new tasks to complete!</p>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+
+          {activeTab === "services" && (
+            <>
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold text-white mb-2">My Services</h1>
+                <p className="text-gray-400">Manage your service offerings</p>
+              </div>
+
+              <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800">
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-semibold text-white mb-4">Active Services</h3>
+                  {providerServices.length === 0 ? (
+                    <div className="text-center py-8">
+                      <i className="fas fa-cog text-4xl text-gray-600 mb-4"></i>
+                      <p className="text-gray-400">No services configured yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {providerServices.map((service: any) => (
+                        <div key={service.id} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-lime-500 to-lime-600 rounded-lg flex items-center justify-center">
+                              <i className={`${platformIcons[service.platform]} text-white`}></i>
+                            </div>
+                            <div>
+                              <p className="text-white font-medium capitalize">
+                                {service.platform} {service.action_type}
+                              </p>
+                              <p className="text-gray-400 text-sm">
+                                Success Rate: {service.success_rate || '0'}%
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lime-500 font-semibold">5.00 KES</p>
+                            <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400">
+                              Active
                             </span>
                           </div>
-                          
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="text-gray-600">Target URL:</p>
-                              <p className="truncate">{assignment.targetUrl}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600">Your Earnings:</p>
-                              <p className="font-semibold text-green-600">
-                                2.00 KES
-                              </p>
-                            </div>
-                          </div>
-                          
-                          {assignment.commentText && (
-                            <div className="mt-3">
-                              <p className="text-gray-600 text-sm">Comment Required:</p>
-                              <p className="text-sm bg-gray-50 p-2 rounded">{assignment.commentText}</p>
-                            </div>
-                          )}
-                          
-                          {assignment.status === 'assigned' && (
-                            <div className="mt-4">
-                              <Button 
-                                size="sm" 
-                                className="mr-2"
-                                onClick={() => handleCompleteAction(assignment.id)}
-                              >
-                                Mark as Completed
-                              </Button>
-                              <Button size="sm" variant="outline">
-                                Need Help
-                              </Button>
-                            </div>
-                          )}
                         </div>
-                      ))
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            </div>
-          )}
-
-          {activeTab === "ai-reverification" && (
-            <div>
-              <h1 className="text-3xl font-bold mb-8">AI Re-verification</h1>
-              <AIReVerificationSection />
-            </div>
+            </>
           )}
 
           {activeTab === "earnings" && (
-            <div>
-              <h1 className="text-3xl font-bold mb-8">Wallet</h1>
-              <WalletDashboard />
-            </div>
+            <>
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold text-white mb-2">Earnings & Withdrawals</h1>
+                <p className="text-gray-400">Track your income and manage withdrawals</p>
+              </div>
+
+              {/* Earnings Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800">
+                  <CardContent className="p-6">
+                    <div className="text-center">
+                      <p className="text-gray-400 text-sm">Total Earnings</p>
+                      <p className="text-3xl font-bold text-lime-500">
+                        {transactions.reduce((sum: number, t: any) => sum + (t.provider_earnings || 0), 0).toFixed(2)} KES
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800">
+                  <CardContent className="p-6">
+                    <div className="text-center">
+                      <p className="text-gray-400 text-sm">This Month</p>
+                      <p className="text-3xl font-bold text-blue-500">
+                        {transactions
+                          .filter((t: any) => new Date(t.created_at).getMonth() === new Date().getMonth())
+                          .reduce((sum: number, t: any) => sum + (t.provider_earnings || 0), 0).toFixed(2)} KES
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800">
+                  <CardContent className="p-6">
+                    <div className="text-center">
+                      <p className="text-gray-400 text-sm">Available Balance</p>
+                      <p className="text-3xl font-bold text-green-500">
+                        {(transactions.reduce((sum: number, t: any) => sum + (t.provider_earnings || 0), 0) - 
+                          withdrawals.reduce((sum: number, w: any) => sum + (parseFloat(w.amount) || 0), 0)).toFixed(2)} KES
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Transaction History */}
+              <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800">
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-semibold text-white mb-4">Transaction History</h3>
+                  {transactions.length === 0 ? (
+                    <div className="text-center py-8">
+                      <i className="fas fa-coins text-4xl text-gray-600 mb-4"></i>
+                      <p className="text-gray-400">No transactions yet. Complete assignments to start earning!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {transactions.map((transaction: any) => (
+                        <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-lime-500 to-lime-600 rounded-lg flex items-center justify-center">
+                              <i className="fas fa-coins text-white"></i>
+                            </div>
+                            <div>
+                              <p className="text-white font-medium capitalize">
+                                {transaction.platform} {transaction.action_type}
+                              </p>
+                              <p className="text-gray-400 text-sm">
+                                {new Date(transaction.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lime-500 font-semibold">
+                              +{transaction.provider_earnings || 0} KES
+                            </p>
+                            <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400">
+                              Completed
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
           )}
         </div>
       </div>
 
-      {/* Content Validator Dialog */}
-      <Dialog open={contentValidator.open} onOpenChange={(open) => setContentValidator(prev => ({ ...prev, open }))}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Content Validation</DialogTitle>
-          </DialogHeader>
-          <ContentValidator
-            content={contentValidator.content}
-            contentType={contentValidator.contentType}
-            onValidationComplete={(isValid, issues) => {
-              if (isValid) {
-                toast({
-                  title: 'Content Validated',
-                  description: 'Your content is appropriate and ready to use!'
-                });
-              } else {
-                toast({
-                  title: 'Content Issues Found',
-                  description: 'Please review the validation results before proceeding.',
-                  variant: 'destructive'
-                });
-              }
-            }}
-            onClose={() => setContentValidator(prev => ({ ...prev, open: false }))}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* Proof Submission Modal */}
+      {proofModal.open && selectedAssignment && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-white">Submit Proof</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setProofModal({ open: false, assignmentId: 0, proofUrl: '', proofType: 'screenshot' })}
+                className="text-gray-400 hover:text-white"
+              >
+                <i className="fas fa-times"></i>
+              </Button>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Assignment</label>
+                <p className="text-white bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                  {selectedAssignment.platform} {selectedAssignment.action_type}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Proof URL</label>
+                <Input
+                  type="url"
+                  placeholder="https://example.com/proof.jpg"
+                  value={proofModal.proofUrl}
+                  onChange={(e) => setProofModal(prev => ({ ...prev, proofUrl: e.target.value }))}
+                  className="bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:border-lime-500 focus:ring-lime-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Proof Type</label>
+                <Select value={proofModal.proofType} onValueChange={(value: 'screenshot' | 'manual') => setProofModal(prev => ({ ...prev, proofType: value }))}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white focus:border-lime-500 focus:ring-lime-500/20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectItem value="screenshot" className="text-white hover:bg-gray-700">Screenshot</SelectItem>
+                    <SelectItem value="manual" className="text-white hover:bg-gray-700">Manual Verification</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="border-t border-gray-800 pt-6">
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleSubmitProof}
+                    disabled={submitProofMutation.isPending}
+                    className="w-full bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-lime-500/25 transition-all duration-300"
+                  >
+                    {submitProofMutation.isPending ? (
+                      <i className="fas fa-spinner fa-spin mr-2"></i>
+                    ) : (
+                      <i className="fas fa-paper-plane mr-2"></i>
+                    )}
+                    Submit Proof
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={() => setProofModal({ open: false, assignmentId: 0, proofUrl: '', proofType: 'screenshot' })}
+                    className="w-full border-gray-700 text-gray-300 hover:border-lime-500 hover:text-lime-500"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

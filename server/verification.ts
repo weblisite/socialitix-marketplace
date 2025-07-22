@@ -363,8 +363,9 @@ export async function reVerifyBuyerRejection(assignmentId: number): Promise<Veri
     }
 
     if (aiResult.success) {
-      // Credit provider's account since AI overturned the buyer rejection
-      await creditProviderAccount(assignment.transactions.provider_id, assignment.transactions.total_cost, assignmentId, 'AI re-verification overturned buyer rejection');
+      // Credit provider's account with 5 KES per action (50% of buyer price)
+      const providerAmount = '5.00'; // Fixed amount per action
+      await creditProviderAccount(assignment.transactions.provider_id, providerAmount, assignmentId, 'AI re-verification overturned buyer rejection');
       
       // Update transaction fulfillment
       await updateTransactionFulfillment(assignment.transaction_id);
@@ -386,7 +387,7 @@ export async function reVerifyBuyerRejection(assignmentId: number): Promise<Veri
             platform: assignment.platform,
             reason: 'AI re-verification overturned buyer rejection',
             confidence: aiResult.confidence ? `${Math.round(aiResult.confidence * 100)}%` : 'N/A',
-            earnings: assignment.transactions.total_cost
+            earnings: '5.00' // Fixed 5 KES per action
           }
         });
       }
@@ -608,8 +609,9 @@ export async function verifyManually(
     }
 
     if (approved) {
-      // Credit provider's account
-      await creditProviderAccount(assignment.transactions.provider_id, assignment.transactions.total_cost, assignmentId, 'Buyer approved proof');
+      // Credit provider's account with 5 KES per action (50% of buyer price)
+      const providerAmount = '5.00'; // Fixed amount per action
+      await creditProviderAccount(assignment.transactions.provider_id, providerAmount, assignmentId, 'Buyer approved proof');
       
       // Update transaction fulfillment
       await updateTransactionFulfillment(assignment.transaction_id);
@@ -636,7 +638,7 @@ export async function verifyManually(
           actionType: assignment.action_type,
           platform: assignment.platform,
           reason: reason || (approved ? 'Buyer approved your proof' : 'Buyer rejected your proof. AI will re-verify in 24 hours.'),
-          earnings: approved ? assignment.transactions.total_cost : '0.00'
+          earnings: approved ? '5.00' : '0.00' // Fixed 5 KES per action
         }
       });
     }
@@ -721,8 +723,9 @@ export async function performAIVerification(assignmentId: number): Promise<Verif
     }
 
     if (aiResult.success) {
-      // Credit provider's account
-      await creditProviderAccount(assignment.transactions.provider_id, assignment.transactions.total_cost, assignmentId, 'AI verification successful');
+      // Credit provider's account with 5 KES per action (50% of buyer price)
+      const providerAmount = '5.00'; // Fixed amount per action
+      await creditProviderAccount(assignment.transactions.provider_id, providerAmount, assignmentId, 'AI verification successful');
       
       // Update transaction fulfillment
       await updateTransactionFulfillment(assignment.transaction_id);
@@ -745,7 +748,7 @@ export async function performAIVerification(assignmentId: number): Promise<Verif
           platform: assignment.platform,
           reason: aiResult.reason,
           confidence: aiResult.confidence ? `${Math.round(aiResult.confidence * 100)}%` : 'N/A',
-          earnings: aiResult.success ? assignment.transactions.total_cost : '0.00'
+          earnings: aiResult.success ? '5.00' : '0.00' // Fixed 5 KES per action
         }
       });
     }
@@ -831,14 +834,14 @@ async function creditProviderAccount(providerId: number, amount: string, assignm
         created_at: new Date().toISOString()
       }]);
 
-    // Log platform revenue (3 KES per quantity)
+    // Log platform revenue (5 KES per quantity)
     await logPlatformRevenue(
       assignment.transaction_id,
       transaction.quantity
     );
 
     console.log(`Credited ${amount} KES to provider ${providerId}. Balance: ${currentBalance} → ${newBalance} KES`);
-    console.log(`Logged platform revenue: ${3 * transaction.quantity} KES for transaction ${assignment.transaction_id}`);
+    console.log(`Logged platform revenue: ${5 * transaction.quantity} KES for transaction ${assignment.transaction_id}`);
   } catch (error) {
     console.error('Error in creditProviderAccount:', error);
   }

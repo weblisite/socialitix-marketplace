@@ -205,6 +205,7 @@ export default function ReportModal({
               variant="outline" 
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
+              className="border-gray-700 bg-gray-800 text-white hover:border-lime-500 hover:text-lime-500 hover:bg-gray-700"
             >
               Cancel
             </Button>

@@ -391,6 +391,11 @@ export class SupabaseStorage implements IStorage {
       ps.platform === platform && ps.action_type === actionType && ps.is_active
     );
 
+    if (relevantProviders.length === 0) {
+      console.warn(`No active providers found for ${platform} ${actionType}`);
+      return;
+    }
+
     // Sort by success rate, completion time, and last active
     relevantProviders.sort((a, b) => {
       // First by success rate (descending)
@@ -407,10 +412,25 @@ export class SupabaseStorage implements IStorage {
       return new Date(b.last_active_at || 0).getTime() - new Date(a.last_active_at || 0).getTime();
     });
 
-    // Assign actions to providers
-    for (let i = 0; i < quantity; i++) {
-      const provider = relevantProviders[i % relevantProviders.length];
-      if (provider) {
+    // Calculate how many assignments each provider should get
+    const assignmentsPerProvider = Math.ceil(quantity / relevantProviders.length);
+    const maxAssignmentsPerProvider = Math.min(assignmentsPerProvider, 10); // Cap at 10 assignments per provider to ensure fair distribution
+
+    console.log(`Distributing ${quantity} assignments among ${relevantProviders.length} providers. Max ${maxAssignmentsPerProvider} per provider.`);
+
+    // Distribute assignments more fairly
+    let assignmentCount = 0;
+    let providerIndex = 0;
+
+    while (assignmentCount < quantity && providerIndex < relevantProviders.length) {
+      const provider = relevantProviders[providerIndex];
+      const assignmentsForThisProvider = Math.min(
+        maxAssignmentsPerProvider,
+        quantity - assignmentCount,
+        Math.ceil((quantity - assignmentCount) / (relevantProviders.length - providerIndex))
+      );
+
+      for (let i = 0; i < assignmentsForThisProvider; i++) {
         const assignment: InsertActionAssignment = {
           transaction_id: transactionId,
           provider_id: provider.provider_id,
@@ -421,8 +441,13 @@ export class SupabaseStorage implements IStorage {
           status: 'assigned'
         };
         await this.createActionAssignment(assignment);
+        assignmentCount++;
       }
+
+      providerIndex++;
     }
+
+    console.log(`Successfully created ${assignmentCount} assignments for transaction ${transactionId}`);
   }
 
   async updateTransactionFulfillment(transactionId: number): Promise<void> {

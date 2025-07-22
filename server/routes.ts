@@ -214,13 +214,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         providerName: service.title,
         buyerDescription: service.description,
         providerDescription: service.description,
-        buyerPrice: parseFloat(service.price),
-        providerPrice: parseFloat(service.price) * 0.4, // 40% for providers
+        buyerPrice: 10.00, // Updated to 10 KES per action
+        providerPrice: 5.00, // Updated to 5 KES per action (50% of buyer price)
         deliveryTime: `${service.delivery_time} hours`,
         requirements: ['Valid account', 'Public profile'],
         icon: `fab fa-${service.platform}`,
         category: service.type === 'followers' || service.type === 'subscribers' ? 'growth' : 
-                 service.type === 'likes' || service.type === 'comments' ? 'engagement' : 'reach'
+                 service.type === 'likes' || service.type === 'comments' ? 'engagement' : 'reach',
+        // Add dynamic URL placeholder based on platform
+        urlPlaceholder: getUrlPlaceholder(service.platform, service.type)
       }));
       
       const { platform, type } = req.query;
@@ -239,6 +241,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to generate dynamic URL placeholders
+  function getUrlPlaceholder(platform: string, type: string): string {
+    const placeholders: { [key: string]: { [key: string]: string } } = {
+      instagram: {
+        followers: 'https://instagram.com/username',
+        likes: 'https://instagram.com/p/post_id',
+        comments: 'https://instagram.com/p/post_id',
+        views: 'https://instagram.com/reel/reel_id'
+      },
+      youtube: {
+        subscribers: 'https://youtube.com/@channel_name',
+        views: 'https://youtube.com/watch?v=video_id',
+        likes: 'https://youtube.com/watch?v=video_id',
+        comments: 'https://youtube.com/watch?v=video_id'
+      },
+      twitter: {
+        followers: 'https://twitter.com/username',
+        likes: 'https://twitter.com/username/status/tweet_id',
+        retweets: 'https://twitter.com/username/status/tweet_id'
+      },
+      tiktok: {
+        followers: 'https://tiktok.com/@username',
+        likes: 'https://tiktok.com/@username/video/video_id',
+        views: 'https://tiktok.com/@username/video/video_id'
+      },
+      facebook: {
+        followers: 'https://facebook.com/page_name',
+        likes: 'https://facebook.com/page_name',
+        'post-likes': 'https://facebook.com/username/posts/post_id',
+        shares: 'https://facebook.com/username/posts/post_id',
+        comments: 'https://facebook.com/username/posts/post_id'
+      }
+    };
+    
+    return placeholders[platform]?.[type] || `https://${platform}.com/your_${type}`;
+  }
+
   // Provider-specific services endpoint
   app.get("/api/services/provider-view", authenticateToken, async (req: any, res) => {
     try {
@@ -249,32 +288,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Return predefined services with provider-specific names
       const predefinedServices = [
         // Instagram Services
-        { id: 'instagram-followers', platform: 'instagram', type: 'followers', name: 'Follow Instagram Account', buyerName: 'Instagram Followers', providerName: 'Follow Instagram Account', buyerDescription: 'Get real Instagram followers to boost your social media presence', providerDescription: 'Follow the specified Instagram account using your personal account', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '24-48 hours', requirements: ['Valid Instagram account', 'Public profile'], icon: 'fab fa-instagram', category: 'growth' },
-        { id: 'instagram-likes', platform: 'instagram', type: 'likes', name: 'Like Instagram Post', buyerName: 'Instagram Likes', providerName: 'Like Instagram Post', buyerDescription: 'Increase engagement on your Instagram posts with likes', providerDescription: 'Like the specified Instagram post using your personal account', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '2-6 hours', requirements: ['Public Instagram post'], icon: 'fab fa-instagram', category: 'engagement' },
-        { id: 'instagram-comments', platform: 'instagram', type: 'comments', name: 'Comment on Instagram Post', buyerName: 'Instagram Comments', providerName: 'Comment on Instagram Post', buyerDescription: 'Add authentic comments to your Instagram posts', providerDescription: 'Write and post a comment on the specified Instagram post', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '4-12 hours', requirements: ['Public Instagram post', 'Comment text provided'], icon: 'fab fa-instagram', category: 'engagement' },
-        { id: 'instagram-views', platform: 'instagram', type: 'views', name: 'Watch Instagram Reel', buyerName: 'Instagram Reels Views', providerName: 'Watch Instagram Reel', buyerDescription: 'Boost your Instagram Reel and video views', providerDescription: 'Watch the specified Instagram Reel or video completely', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '1-3 hours', requirements: ['Public Instagram Reel'], icon: 'fab fa-instagram', category: 'reach' },
+        { id: 'instagram-followers', platform: 'instagram', type: 'followers', name: 'Follow Instagram Account', buyerName: 'Instagram Followers', providerName: 'Follow Instagram Account', buyerDescription: 'Get real Instagram followers to boost your social media presence', providerDescription: 'Follow the specified Instagram account using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '24-48 hours', requirements: ['Valid Instagram account', 'Public profile'], icon: 'fab fa-instagram', category: 'growth', urlPlaceholder: 'https://instagram.com/username' },
+        { id: 'instagram-likes', platform: 'instagram', type: 'likes', name: 'Like Instagram Post', buyerName: 'Instagram Likes', providerName: 'Like Instagram Post', buyerDescription: 'Increase engagement on your Instagram posts with likes', providerDescription: 'Like the specified Instagram post using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '2-6 hours', requirements: ['Public Instagram post'], icon: 'fab fa-instagram', category: 'engagement', urlPlaceholder: 'https://instagram.com/p/post_id' },
+        { id: 'instagram-comments', platform: 'instagram', type: 'comments', name: 'Comment on Instagram Post', buyerName: 'Instagram Comments', providerName: 'Comment on Instagram Post', buyerDescription: 'Add authentic comments to your Instagram posts', providerDescription: 'Write and post a comment on the specified Instagram post', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '4-12 hours', requirements: ['Public Instagram post', 'Comment text provided'], icon: 'fab fa-instagram', category: 'engagement', urlPlaceholder: 'https://instagram.com/p/post_id' },
+        { id: 'instagram-views', platform: 'instagram', type: 'views', name: 'Watch Instagram Reel', buyerName: 'Instagram Reels Views', providerName: 'Watch Instagram Reel', buyerDescription: 'Boost your Instagram Reel and video views', providerDescription: 'Watch the specified Instagram Reel or video completely', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '1-3 hours', requirements: ['Public Instagram Reel'], icon: 'fab fa-instagram', category: 'reach', urlPlaceholder: 'https://instagram.com/reel/reel_id' },
         
         // YouTube Services
-        { id: 'youtube-subscribers', platform: 'youtube', type: 'subscribers', name: 'Subscribe to YouTube Channel', buyerName: 'YouTube Subscribers', providerName: 'Subscribe to YouTube Channel', buyerDescription: 'Build your YouTube subscriber base', providerDescription: 'Subscribe to the specified YouTube channel using your personal account', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '48-72 hours', requirements: ['Public YouTube channel'], icon: 'fab fa-youtube', category: 'growth' },
-        { id: 'youtube-views', platform: 'youtube', type: 'views', name: 'Watch YouTube Video', buyerName: 'YouTube Views', providerName: 'Watch YouTube Video', buyerDescription: 'Boost your YouTube video views', providerDescription: 'Watch the specified YouTube video completely (minimum 30 seconds)', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '24-48 hours', requirements: ['Public YouTube video'], icon: 'fab fa-youtube', category: 'reach' },
-        { id: 'youtube-likes', platform: 'youtube', type: 'likes', name: 'Like YouTube Video', buyerName: 'YouTube Likes', providerName: 'Like YouTube Video', buyerDescription: 'Get more likes on your YouTube videos', providerDescription: 'Like the specified YouTube video using your personal account', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '6-12 hours', requirements: ['Public YouTube video'], icon: 'fab fa-youtube', category: 'engagement' },
-        { id: 'youtube-comments', platform: 'youtube', type: 'comments', name: 'Comment on YouTube Video', buyerName: 'YouTube Comments', providerName: 'Comment on YouTube Video', buyerDescription: 'Add engaging comments to your YouTube videos', providerDescription: 'Write and post a comment on the specified YouTube video', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '12-24 hours', requirements: ['Public YouTube video', 'Comment text provided'], icon: 'fab fa-youtube', category: 'engagement' },
+        { id: 'youtube-subscribers', platform: 'youtube', type: 'subscribers', name: 'Subscribe to YouTube Channel', buyerName: 'YouTube Subscribers', providerName: 'Subscribe to YouTube Channel', buyerDescription: 'Build your YouTube subscriber base', providerDescription: 'Subscribe to the specified YouTube channel using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '48-72 hours', requirements: ['Public YouTube channel'], icon: 'fab fa-youtube', category: 'growth', urlPlaceholder: 'https://youtube.com/@channel_name' },
+        { id: 'youtube-views', platform: 'youtube', type: 'views', name: 'Watch YouTube Video', buyerName: 'YouTube Views', providerName: 'Watch YouTube Video', buyerDescription: 'Boost your YouTube video views', providerDescription: 'Watch the specified YouTube video completely (minimum 30 seconds)', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '24-48 hours', requirements: ['Public YouTube video'], icon: 'fab fa-youtube', category: 'reach', urlPlaceholder: 'https://youtube.com/watch?v=video_id' },
+        { id: 'youtube-likes', platform: 'youtube', type: 'likes', name: 'Like YouTube Video', buyerName: 'YouTube Likes', providerName: 'Like YouTube Video', buyerDescription: 'Get more likes on your YouTube videos', providerDescription: 'Like the specified YouTube video using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '6-12 hours', requirements: ['Public YouTube video'], icon: 'fab fa-youtube', category: 'engagement', urlPlaceholder: 'https://youtube.com/watch?v=video_id' },
+        { id: 'youtube-comments', platform: 'youtube', type: 'comments', name: 'Comment on YouTube Video', buyerName: 'YouTube Comments', providerName: 'Comment on YouTube Video', buyerDescription: 'Add engaging comments to your YouTube videos', providerDescription: 'Write and post a comment on the specified YouTube video', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '12-24 hours', requirements: ['Public YouTube video', 'Comment text provided'], icon: 'fab fa-youtube', category: 'engagement', urlPlaceholder: 'https://youtube.com/watch?v=video_id' },
         
         // Twitter Services
-        { id: 'twitter-followers', platform: 'twitter', type: 'followers', name: 'Follow X / Twitter Account', buyerName: 'X / Twitter Followers', providerName: 'Follow X / Twitter Account', buyerDescription: 'Increase your X / Twitter following', providerDescription: 'Follow the specified X / Twitter account using your personal account', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '24-48 hours', requirements: ['Public X / Twitter account'], icon: 'fab fa-twitter', category: 'growth' },
-        { id: 'twitter-likes', platform: 'twitter', type: 'likes', name: 'Like X / Twitter Tweet', buyerName: 'X / Twitter Likes', providerName: 'Like X / Twitter Tweet', buyerDescription: 'Get more likes on your X / Twitter tweets', providerDescription: 'Like the specified X / Twitter tweet using your personal account', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '2-6 hours', requirements: ['Public X / Twitter post'], icon: 'fab fa-twitter', category: 'engagement' },
-        { id: 'twitter-retweets', platform: 'twitter', type: 'retweets', name: 'Retweet X / Twitter Post', buyerName: 'X / Twitter Retweets', providerName: 'Retweet X / Twitter Post', buyerDescription: 'Increase retweets on your X / Twitter content', providerDescription: 'Retweet the specified X / Twitter post using your personal account', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '4-12 hours', requirements: ['Public X / Twitter post'], icon: 'fab fa-twitter', category: 'reach' },
+        { id: 'twitter-followers', platform: 'twitter', type: 'followers', name: 'Follow X / Twitter Account', buyerName: 'X / Twitter Followers', providerName: 'Follow X / Twitter Account', buyerDescription: 'Increase your X / Twitter following', providerDescription: 'Follow the specified X / Twitter account using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '24-48 hours', requirements: ['Public X / Twitter account'], icon: 'fab fa-twitter', category: 'growth', urlPlaceholder: 'https://twitter.com/username' },
+        { id: 'twitter-likes', platform: 'twitter', type: 'likes', name: 'Like X / Twitter Tweet', buyerName: 'X / Twitter Likes', providerName: 'Like X / Twitter Tweet', buyerDescription: 'Get more likes on your X / Twitter tweets', providerDescription: 'Like the specified X / Twitter tweet using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '2-6 hours', requirements: ['Public X / Twitter post'], icon: 'fab fa-twitter', category: 'engagement', urlPlaceholder: 'https://twitter.com/username/status/tweet_id' },
+        { id: 'twitter-retweets', platform: 'twitter', type: 'retweets', name: 'Retweet X / Twitter Post', buyerName: 'X / Twitter Retweets', providerName: 'Retweet X / Twitter Post', buyerDescription: 'Increase retweets on your X / Twitter content', providerDescription: 'Retweet the specified X / Twitter post using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '4-12 hours', requirements: ['Public X / Twitter post'], icon: 'fab fa-twitter', category: 'reach', urlPlaceholder: 'https://twitter.com/username/status/tweet_id' },
         
         // TikTok Services
-        { id: 'tiktok-followers', platform: 'tiktok', type: 'followers', name: 'Follow TikTok Account', buyerName: 'TikTok Followers', providerName: 'Follow TikTok Account', buyerDescription: 'Grow your TikTok following with real followers', providerDescription: 'Follow the specified TikTok account using your personal account', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '24-48 hours', requirements: ['Public TikTok account'], icon: 'fab fa-tiktok', category: 'growth' },
-        { id: 'tiktok-likes', platform: 'tiktok', type: 'likes', name: 'Like TikTok Video', buyerName: 'TikTok Likes', providerName: 'Like TikTok Video', buyerDescription: 'Get more likes on your TikTok videos', providerDescription: 'Like the specified TikTok video using your personal account', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '2-6 hours', requirements: ['Public TikTok video'], icon: 'fab fa-tiktok', category: 'engagement' },
-        { id: 'tiktok-views', platform: 'tiktok', type: 'views', name: 'Watch TikTok Video', buyerName: 'TikTok Views', providerName: 'Watch TikTok Video', buyerDescription: 'Increase views on your TikTok videos', providerDescription: 'Watch the specified TikTok video completely', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '1-3 hours', requirements: ['Public TikTok video'], icon: 'fab fa-tiktok', category: 'reach' },
+        { id: 'tiktok-followers', platform: 'tiktok', type: 'followers', name: 'Follow TikTok Account', buyerName: 'TikTok Followers', providerName: 'Follow TikTok Account', buyerDescription: 'Grow your TikTok following with real followers', providerDescription: 'Follow the specified TikTok account using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '24-48 hours', requirements: ['Public TikTok account'], icon: 'fab fa-tiktok', category: 'growth', urlPlaceholder: 'https://tiktok.com/@username' },
+        { id: 'tiktok-likes', platform: 'tiktok', type: 'likes', name: 'Like TikTok Video', buyerName: 'TikTok Likes', providerName: 'Like TikTok Video', buyerDescription: 'Get more likes on your TikTok videos', providerDescription: 'Like the specified TikTok video using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '2-6 hours', requirements: ['Public TikTok video'], icon: 'fab fa-tiktok', category: 'engagement', urlPlaceholder: 'https://tiktok.com/@username/video/video_id' },
+        { id: 'tiktok-views', platform: 'tiktok', type: 'views', name: 'Watch TikTok Video', buyerName: 'TikTok Views', providerName: 'Watch TikTok Video', buyerDescription: 'Increase views on your TikTok videos', providerDescription: 'Watch the specified TikTok video completely', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '1-3 hours', requirements: ['Public TikTok video'], icon: 'fab fa-tiktok', category: 'reach', urlPlaceholder: 'https://tiktok.com/@username/video/video_id' },
 
         // Facebook Services
-        { id: 'facebook-likes', platform: 'facebook', type: 'likes', name: 'Like Facebook Page', buyerName: 'Facebook Page Likes', providerName: 'Like Facebook Page', buyerDescription: 'Increase likes on your Facebook page', providerDescription: 'Like the specified Facebook page using your personal account', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '24-48 hours', requirements: ['Public Facebook page'], icon: 'fab fa-facebook', category: 'growth' },
-        { id: 'facebook-post-likes', platform: 'facebook', type: 'post-likes', name: 'Like Facebook Post', buyerName: 'Facebook Post Likes', providerName: 'Like Facebook Post', buyerDescription: 'Get more likes on your Facebook posts', providerDescription: 'Like the specified Facebook post using your personal account', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '2-6 hours', requirements: ['Public Facebook post'], icon: 'fab fa-facebook', category: 'engagement' },
-        { id: 'facebook-shares', platform: 'facebook', type: 'shares', name: 'Share Facebook Post', buyerName: 'Facebook Shares', providerName: 'Share Facebook Post', buyerDescription: 'Increase shares on your Facebook content', providerDescription: 'Share the specified Facebook post using your personal account', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '4-12 hours', requirements: ['Public Facebook post'], icon: 'fab fa-facebook', category: 'reach' },
-        { id: 'facebook-comments', platform: 'facebook', type: 'comments', name: 'Comment on Facebook Post', buyerName: 'Facebook Comments', providerName: 'Comment on Facebook Post', buyerDescription: 'Add engaging comments to your Facebook posts', providerDescription: 'Write and post a comment on the specified Facebook post', buyerPrice: 5.00, providerPrice: 2.00, deliveryTime: '6-12 hours', requirements: ['Public Facebook post', 'Comment text provided'], icon: 'fab fa-facebook', category: 'engagement' }
+        { id: 'facebook-likes', platform: 'facebook', type: 'likes', name: 'Like Facebook Page', buyerName: 'Facebook Page Likes', providerName: 'Like Facebook Page', buyerDescription: 'Increase likes on your Facebook page', providerDescription: 'Like the specified Facebook page using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '24-48 hours', requirements: ['Public Facebook page'], icon: 'fab fa-facebook', category: 'growth', urlPlaceholder: 'https://facebook.com/page_name' },
+        { id: 'facebook-followers', platform: 'facebook', type: 'followers', name: 'Follow Facebook Page', buyerName: 'Facebook Followers', providerName: 'Follow Facebook Page', buyerDescription: 'Get real Facebook followers to boost your page engagement', providerDescription: 'Follow the specified Facebook page using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '24-48 hours', requirements: ['Public Facebook page'], icon: 'fab fa-facebook', category: 'growth', urlPlaceholder: 'https://facebook.com/page_name' },
+        { id: 'facebook-shares', platform: 'facebook', type: 'shares', name: 'Share Facebook Post', buyerName: 'Facebook Shares', providerName: 'Share Facebook Post', buyerDescription: 'Increase shares on your Facebook content', providerDescription: 'Share the specified Facebook post using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '4-12 hours', requirements: ['Public Facebook post'], icon: 'fab fa-facebook', category: 'reach', urlPlaceholder: 'https://facebook.com/username/posts/post_id' },
+        { id: 'facebook-comments', platform: 'facebook', type: 'comments', name: 'Comment on Facebook Post', buyerName: 'Facebook Comments', providerName: 'Comment on Facebook Post', buyerDescription: 'Add engaging comments to your Facebook posts', providerDescription: 'Write and post a comment on the specified Facebook post', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '6-12 hours', requirements: ['Public Facebook post', 'Comment text provided'], icon: 'fab fa-facebook', category: 'engagement', urlPlaceholder: 'https://facebook.com/username/posts/post_id' }
       ];
       
       const { platform, type } = req.query;

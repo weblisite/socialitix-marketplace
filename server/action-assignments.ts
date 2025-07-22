@@ -92,32 +92,141 @@ export async function createActionAssignments(transactionId: number): Promise<vo
 
 // Get assignments for a provider
 export async function getProviderAssignments(providerId: number, status?: string) {
-  let query = supabase
-    .from('action_assignments')
-    .select(`
-      *,
-      transactions!inner(provider_earnings, buyer_id),
-      users!inner(name)
-    `)
-    .eq('provider_id', providerId);
+  try {
+    // First, get all assignments for this provider
+    let query = supabase
+      .from('action_assignments')
+      .select(`
+        *,
+        transactions!inner(provider_earnings, buyer_id),
+        users!inner(name)
+      `)
+      .eq('provider_id', providerId);
 
-  if (status) {
-    query = query.eq('status', status);
-  }
+    if (status) {
+      query = query.eq('status', status);
+    }
 
-  const { data, error } = await query.order('assigned_at', { ascending: false });
-  
-  if (error) {
-    console.error('Error getting provider assignments:', error);
+    const { data: allAssignments, error } = await query.order('assigned_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error getting provider assignments:', error);
+      return [];
+    }
+
+    if (!allAssignments || allAssignments.length === 0) {
+      return [];
+    }
+
+    // Filter assignments to prevent showing multiple assignments from the same transaction
+    const filteredAssignments: any[] = [];
+    const transactionIdsWithActiveAssignments = new Set<number>();
+
+    // First pass: identify transactions where provider already has active assignments
+    for (const assignment of allAssignments) {
+      if (['assigned', 'in_progress', 'pending_verification', 'approved_by_buyer', 'approved_by_ai'].includes(assignment.status)) {
+        transactionIdsWithActiveAssignments.add(assignment.transaction_id);
+      }
+    }
+
+    // Second pass: only include assignments that don't conflict with existing active assignments
+    for (const assignment of allAssignments) {
+      const transactionId = assignment.transaction_id;
+      
+      if (transactionIdsWithActiveAssignments.has(transactionId)) {
+        // For transactions with active assignments, only include the active one
+        if (['assigned', 'in_progress', 'pending_verification', 'approved_by_buyer', 'approved_by_ai'].includes(assignment.status)) {
+          // Check if this is the first active assignment we've seen for this transaction
+          const existingActive = filteredAssignments.find(a => 
+            a.transaction_id === transactionId && 
+            ['assigned', 'in_progress', 'pending_verification', 'approved_by_buyer', 'approved_by_ai'].includes(a.status)
+          );
+          
+          if (!existingActive) {
+            filteredAssignments.push(assignment);
+          }
+        }
+      } else {
+        // For transactions without active assignments, include all assignments
+        filteredAssignments.push(assignment);
+      }
+    }
+
+    return filteredAssignments;
+  } catch (error) {
+    console.error('Error in getProviderAssignments:', error);
     return [];
   }
+}
 
-  return data || [];
+// Check if provider can claim an assignment from a specific transaction
+export async function canProviderClaimAssignment(providerId: number, transactionId: number): Promise<{ canClaim: boolean; reason?: string }> {
+  try {
+    // Check if provider already has an active assignment from this transaction
+    const { data: existingAssignments, error } = await supabase
+      .from('action_assignments')
+      .select('id, status')
+      .eq('transaction_id', transactionId)
+      .eq('provider_id', providerId)
+      .in('status', ['assigned', 'in_progress', 'pending_verification', 'approved_by_buyer', 'approved_by_ai']);
+
+    if (error) {
+      return { canClaim: false, reason: 'Error checking existing assignments' };
+    }
+
+    if (existingAssignments && existingAssignments.length > 0) {
+      return { 
+        canClaim: false, 
+        reason: 'You can only claim one assignment per order. You already have an active assignment from this transaction.' 
+      };
+    }
+
+    return { canClaim: true };
+  } catch (error) {
+    return { canClaim: false, reason: 'Unknown error occurred' };
+  }
 }
 
 // Mark assignment as in progress
 export async function startAssignment(assignmentId: number, providerId: number): Promise<{ success: boolean; error?: string }> {
   try {
+    // First, get the assignment details to check the transaction
+    const { data: assignmentData, error: assignmentError } = await supabase
+      .from('action_assignments')
+      .select('transaction_id, status')
+      .eq('id', assignmentId)
+      .single();
+
+    if (assignmentError || !assignmentData) {
+      return { success: false, error: 'Assignment not found' };
+    }
+
+    // Check if provider already has an active assignment from this transaction
+    const { data: existingAssignments, error: existingError } = await supabase
+      .from('action_assignments')
+      .select('id, status')
+      .eq('transaction_id', assignmentData.transaction_id)
+      .eq('provider_id', providerId)
+      .in('status', ['assigned', 'in_progress', 'pending_verification', 'approved_by_buyer', 'approved_by_ai']);
+
+    if (existingError) {
+      return { success: false, error: 'Error checking existing assignments' };
+    }
+
+    // If provider already has an active assignment from this transaction, prevent claiming another one
+    if (existingAssignments && existingAssignments.length > 0) {
+      const activeAssignment = existingAssignments.find(a => a.id !== assignmentId);
+      if (activeAssignment) {
+        return { success: false, error: 'You can only claim one assignment per order. You already have an active assignment from this transaction.' };
+      }
+    }
+
+    // Check if this specific assignment is still available
+    if (assignmentData.status !== 'assigned') {
+      return { success: false, error: 'Assignment is no longer available' };
+    }
+
+    // Update the assignment status to in_progress
     const { data, error } = await supabase
       .from('action_assignments')
       .update({ status: 'in_progress' })
