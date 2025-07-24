@@ -1349,13 +1349,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Get provider's selected services
-      const { data: providerServices, error: servicesError } = await supabase
+      const { data: providerServices, error: providerServicesError } = await supabase
         .from('provider_services')
         .select('service_id')
         .eq('provider_id', req.user.id)
         .eq('status', 'active');
 
-      if (servicesError) throw servicesError;
+      if (providerServicesError) throw providerServicesError;
 
       console.log('Provider services found:', providerServices);
 
