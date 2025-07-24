@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import { useAuth } from '@/lib/auth';
 
 interface EmailNotification {
   id: number;
@@ -40,6 +41,7 @@ export default function EmailNotifications() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     loadNotifications();
@@ -47,39 +49,19 @@ export default function EmailNotifications() {
 
   const loadNotifications = async () => {
     try {
-      // In a real implementation, you'd fetch from /api/email/notifications
-      // For now, we'll use mock data
-      const mockNotifications: EmailNotification[] = [
-        {
-          id: 1,
-          type: 'transaction',
-          title: 'Payment Confirmed',
-          content: 'Your payment of 500 KES has been confirmed. Your order is being processed.',
-          sentAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          status: 'sent',
-          read: false
-        },
-        {
-          id: 2,
-          type: 'assignment',
-          title: 'New Assignment Available',
-          content: 'You have a new assignment available. Check your dashboard to get started.',
-          sentAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          status: 'sent',
-          read: true
-        },
-        {
-          id: 3,
-          type: 'withdrawal',
-          title: 'Withdrawal Processed',
-          content: 'Your withdrawal request of 1000 KES has been processed successfully.',
-          sentAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'sent',
-          read: true
-        }
-      ];
-      setNotifications(mockNotifications);
+      // Fetch real notifications from the API
+      const response = await apiRequest('GET', '/api/email/notifications');
+      if (response && response.ok) {
+        const data = await response.json();
+        setNotifications(data || []);
+      } else {
+        // Fallback to empty array if API fails
+        setNotifications([]);
+      }
     } catch (error) {
+      console.error('Failed to load notifications:', error);
+      // Fallback to empty array on error
+      setNotifications([]);
       toast({
         title: 'Error',
         description: 'Failed to load notifications',
@@ -126,17 +108,19 @@ export default function EmailNotifications() {
 
   const sendTestEmail = async () => {
     try {
+      // Use the actual user's email instead of hardcoded test email
+      const userEmail = user?.email || 'test@example.com';
       await apiRequest('POST', '/api/email/send', {
-        to: 'user@example.com',
+        to: userEmail,
         templateName: 'test_notification',
         variables: {
-          userName: 'Test User',
+          userName: user?.name || 'User',
           message: 'This is a test notification'
         }
       });
       toast({
         title: 'Test Email Sent',
-        description: 'A test email has been sent to your address'
+        description: `A test email has been sent to ${userEmail}`
       });
     } catch (error) {
       toast({

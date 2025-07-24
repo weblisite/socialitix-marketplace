@@ -258,13 +258,19 @@ export async function logPaymentTransaction(
     // In a real system, you would implement provider selection logic here
     const providerId = 1; // Default provider - you can implement provider selection logic later
     
+    // Ensure amount is a valid number
+    const validatedAmount = Number(amount);
+    if (isNaN(validatedAmount) || validatedAmount <= 0) {
+      throw new Error(`Invalid amount: ${amount}`);
+    }
+
     const transactionData = {
       buyer_id: userId,
       provider_id: providerId, // Add the required provider_id field
       service_id: serviceId,
       quantity: quantity,
-      amount: amount, // Add the required amount field (NOT NULL constraint)
-      total_cost: amount.toString(), // Keep total_cost for compatibility
+      amount: validatedAmount, // Ensure it's a valid number
+      total_cost: validatedAmount.toString(), // Keep total_cost for compatibility
       comment_text: commentText || '',
       target_url: targetUrl || '',
       status: status === 'completed' ? 'completed' : 'pending',

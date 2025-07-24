@@ -90,7 +90,7 @@ export async function getUserSocialAccounts(userId: number) {
   return data || [];
 }
 
-// Verify action completion (mock implementation for now)
+// Verify action completion (manual/AI verification implementation)
 export async function verifyActionCompletion(
   assignmentId: number,
   actionType: string,
@@ -100,8 +100,8 @@ export async function verifyActionCompletion(
   proofData?: any
 ): Promise<VerificationResult> {
   
-  // For demonstration, we'll implement basic verification logic
-  // In production, this would integrate with actual social media APIs
+  // This function now focuses on manual and AI verification
+  // Social media API integration is not implemented as per user requirements
   
   const config = PLATFORM_CONFIGS[platform];
   if (!config) {
@@ -126,17 +126,20 @@ export async function verifyActionCompletion(
       };
     }
 
-    // Mock API verification (in production, this would call actual APIs)
-    if (config.authRequired && linkedAccount[0].accessToken) {
-      return await mockApiVerification(actionType, platform, targetUrl, linkedAccount[0]);
-    }
-
-    // Fallback to manual verification
+    // For now, all verifications go through manual/AI review
+    // This can be enhanced with AI verification in the future
     return {
       success: true,
       method: 'manual',
       needsManualReview: true,
-      data: { requiresManualVerification: true }
+      data: { 
+        requiresManualVerification: true,
+        assignmentId,
+        platform,
+        actionType,
+        providerId,
+        submittedAt: new Date().toISOString()
+      }
     };
 
   } catch (error) {
@@ -145,75 +148,6 @@ export async function verifyActionCompletion(
       method: 'manual', 
       error: error instanceof Error ? error.message : 'Verification failed' 
     };
-  }
-}
-
-// Mock API verification for demonstration
-async function mockApiVerification(
-  actionType: string,
-  platform: string,
-  targetUrl: string,
-  account: any
-): Promise<VerificationResult> {
-  
-  // Simulate API delays
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Mock verification logic based on action type
-  switch (actionType) {
-    case 'followers':
-      return {
-        success: true,
-        method: 'api',
-        data: { 
-          verified: true, 
-          followerCount: Math.floor(Math.random() * 1000),
-          verifiedAt: new Date().toISOString()
-        }
-      };
-      
-    case 'likes':
-      return {
-        success: true,
-        method: 'api',
-        data: { 
-          verified: true,
-          likeConfirmed: true,
-          likeId: `like_${Math.random().toString(36).substr(2, 9)}`,
-          verifiedAt: new Date().toISOString()
-        }
-      };
-      
-    case 'comments':
-      return {
-        success: true,
-        method: 'api',
-        data: { 
-          verified: true,
-          commentId: `comment_${Math.random().toString(36).substr(2, 9)}`,
-          commentText: 'Verified comment posted',
-          verifiedAt: new Date().toISOString()
-        }
-      };
-      
-    case 'views':
-      return {
-        success: true,
-        method: 'api',
-        data: { 
-          verified: true,
-          viewCount: Math.floor(Math.random() * 500),
-          verifiedAt: new Date().toISOString()
-        }
-      };
-      
-    default:
-      return {
-        success: false,
-        method: 'api',
-        error: 'Action type not supported for API verification',
-        needsManualReview: true
-      };
   }
 }
 

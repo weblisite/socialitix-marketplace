@@ -209,6 +209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: service.id.toString(),
         platform: service.platform,
         type: service.type,
+        title: service.title, // Add title field for frontend compatibility
         name: service.title,
         buyerName: service.title,
         providerName: service.title,
@@ -285,39 +286,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Provider access required" });
       }
 
-      // Return predefined services with provider-specific names
-      const predefinedServices = [
-        // Instagram Services
-        { id: 'instagram-followers', platform: 'instagram', type: 'followers', name: 'Follow Instagram Account', buyerName: 'Instagram Followers', providerName: 'Follow Instagram Account', buyerDescription: 'Get real Instagram followers to boost your social media presence', providerDescription: 'Follow the specified Instagram account using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '24-48 hours', requirements: ['Valid Instagram account', 'Public profile'], icon: 'fab fa-instagram', category: 'growth', urlPlaceholder: 'https://instagram.com/username' },
-        { id: 'instagram-likes', platform: 'instagram', type: 'likes', name: 'Like Instagram Post', buyerName: 'Instagram Likes', providerName: 'Like Instagram Post', buyerDescription: 'Increase engagement on your Instagram posts with likes', providerDescription: 'Like the specified Instagram post using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '2-6 hours', requirements: ['Public Instagram post'], icon: 'fab fa-instagram', category: 'engagement', urlPlaceholder: 'https://instagram.com/p/post_id' },
-        { id: 'instagram-comments', platform: 'instagram', type: 'comments', name: 'Comment on Instagram Post', buyerName: 'Instagram Comments', providerName: 'Comment on Instagram Post', buyerDescription: 'Add authentic comments to your Instagram posts', providerDescription: 'Write and post a comment on the specified Instagram post', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '4-12 hours', requirements: ['Public Instagram post', 'Comment text provided'], icon: 'fab fa-instagram', category: 'engagement', urlPlaceholder: 'https://instagram.com/p/post_id' },
-        { id: 'instagram-views', platform: 'instagram', type: 'views', name: 'Watch Instagram Reel', buyerName: 'Instagram Reels Views', providerName: 'Watch Instagram Reel', buyerDescription: 'Boost your Instagram Reel and video views', providerDescription: 'Watch the specified Instagram Reel or video completely', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '1-3 hours', requirements: ['Public Instagram Reel'], icon: 'fab fa-instagram', category: 'reach', urlPlaceholder: 'https://instagram.com/reel/reel_id' },
-        
-        // YouTube Services
-        { id: 'youtube-subscribers', platform: 'youtube', type: 'subscribers', name: 'Subscribe to YouTube Channel', buyerName: 'YouTube Subscribers', providerName: 'Subscribe to YouTube Channel', buyerDescription: 'Build your YouTube subscriber base', providerDescription: 'Subscribe to the specified YouTube channel using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '48-72 hours', requirements: ['Public YouTube channel'], icon: 'fab fa-youtube', category: 'growth', urlPlaceholder: 'https://youtube.com/@channel_name' },
-        { id: 'youtube-views', platform: 'youtube', type: 'views', name: 'Watch YouTube Video', buyerName: 'YouTube Views', providerName: 'Watch YouTube Video', buyerDescription: 'Boost your YouTube video views', providerDescription: 'Watch the specified YouTube video completely (minimum 30 seconds)', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '24-48 hours', requirements: ['Public YouTube video'], icon: 'fab fa-youtube', category: 'reach', urlPlaceholder: 'https://youtube.com/watch?v=video_id' },
-        { id: 'youtube-likes', platform: 'youtube', type: 'likes', name: 'Like YouTube Video', buyerName: 'YouTube Likes', providerName: 'Like YouTube Video', buyerDescription: 'Get more likes on your YouTube videos', providerDescription: 'Like the specified YouTube video using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '6-12 hours', requirements: ['Public YouTube video'], icon: 'fab fa-youtube', category: 'engagement', urlPlaceholder: 'https://youtube.com/watch?v=video_id' },
-        { id: 'youtube-comments', platform: 'youtube', type: 'comments', name: 'Comment on YouTube Video', buyerName: 'YouTube Comments', providerName: 'Comment on YouTube Video', buyerDescription: 'Add engaging comments to your YouTube videos', providerDescription: 'Write and post a comment on the specified YouTube video', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '12-24 hours', requirements: ['Public YouTube video', 'Comment text provided'], icon: 'fab fa-youtube', category: 'engagement', urlPlaceholder: 'https://youtube.com/watch?v=video_id' },
-        
-        // Twitter Services
-        { id: 'twitter-followers', platform: 'twitter', type: 'followers', name: 'Follow X / Twitter Account', buyerName: 'X / Twitter Followers', providerName: 'Follow X / Twitter Account', buyerDescription: 'Increase your X / Twitter following', providerDescription: 'Follow the specified X / Twitter account using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '24-48 hours', requirements: ['Public X / Twitter account'], icon: 'fab fa-twitter', category: 'growth', urlPlaceholder: 'https://twitter.com/username' },
-        { id: 'twitter-likes', platform: 'twitter', type: 'likes', name: 'Like X / Twitter Tweet', buyerName: 'X / Twitter Likes', providerName: 'Like X / Twitter Tweet', buyerDescription: 'Get more likes on your X / Twitter tweets', providerDescription: 'Like the specified X / Twitter tweet using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '2-6 hours', requirements: ['Public X / Twitter post'], icon: 'fab fa-twitter', category: 'engagement', urlPlaceholder: 'https://twitter.com/username/status/tweet_id' },
-        { id: 'twitter-retweets', platform: 'twitter', type: 'retweets', name: 'Retweet X / Twitter Post', buyerName: 'X / Twitter Retweets', providerName: 'Retweet X / Twitter Post', buyerDescription: 'Increase retweets on your X / Twitter content', providerDescription: 'Retweet the specified X / Twitter post using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '4-12 hours', requirements: ['Public X / Twitter post'], icon: 'fab fa-twitter', category: 'reach', urlPlaceholder: 'https://twitter.com/username/status/tweet_id' },
-        
-        // TikTok Services
-        { id: 'tiktok-followers', platform: 'tiktok', type: 'followers', name: 'Follow TikTok Account', buyerName: 'TikTok Followers', providerName: 'Follow TikTok Account', buyerDescription: 'Grow your TikTok following with real followers', providerDescription: 'Follow the specified TikTok account using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '24-48 hours', requirements: ['Public TikTok account'], icon: 'fab fa-tiktok', category: 'growth', urlPlaceholder: 'https://tiktok.com/@username' },
-        { id: 'tiktok-likes', platform: 'tiktok', type: 'likes', name: 'Like TikTok Video', buyerName: 'TikTok Likes', providerName: 'Like TikTok Video', buyerDescription: 'Get more likes on your TikTok videos', providerDescription: 'Like the specified TikTok video using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '2-6 hours', requirements: ['Public TikTok video'], icon: 'fab fa-tiktok', category: 'engagement', urlPlaceholder: 'https://tiktok.com/@username/video/video_id' },
-        { id: 'tiktok-views', platform: 'tiktok', type: 'views', name: 'Watch TikTok Video', buyerName: 'TikTok Views', providerName: 'Watch TikTok Video', buyerDescription: 'Increase views on your TikTok videos', providerDescription: 'Watch the specified TikTok video completely', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '1-3 hours', requirements: ['Public TikTok video'], icon: 'fab fa-tiktok', category: 'reach', urlPlaceholder: 'https://tiktok.com/@username/video/video_id' },
+      // Fetch services from database
+      const { data: services, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('status', 'active')
+        .order('platform', { ascending: true })
+        .order('type', { ascending: true });
 
-        // Facebook Services
-        { id: 'facebook-likes', platform: 'facebook', type: 'likes', name: 'Like Facebook Page', buyerName: 'Facebook Page Likes', providerName: 'Like Facebook Page', buyerDescription: 'Increase likes on your Facebook page', providerDescription: 'Like the specified Facebook page using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '24-48 hours', requirements: ['Public Facebook page'], icon: 'fab fa-facebook', category: 'growth', urlPlaceholder: 'https://facebook.com/page_name' },
-        { id: 'facebook-followers', platform: 'facebook', type: 'followers', name: 'Follow Facebook Page', buyerName: 'Facebook Followers', providerName: 'Follow Facebook Page', buyerDescription: 'Get real Facebook followers to boost your page engagement', providerDescription: 'Follow the specified Facebook page using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '24-48 hours', requirements: ['Public Facebook page'], icon: 'fab fa-facebook', category: 'growth', urlPlaceholder: 'https://facebook.com/page_name' },
-        { id: 'facebook-shares', platform: 'facebook', type: 'shares', name: 'Share Facebook Post', buyerName: 'Facebook Shares', providerName: 'Share Facebook Post', buyerDescription: 'Increase shares on your Facebook content', providerDescription: 'Share the specified Facebook post using your personal account', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '4-12 hours', requirements: ['Public Facebook post'], icon: 'fab fa-facebook', category: 'reach', urlPlaceholder: 'https://facebook.com/username/posts/post_id' },
-        { id: 'facebook-comments', platform: 'facebook', type: 'comments', name: 'Comment on Facebook Post', buyerName: 'Facebook Comments', providerName: 'Comment on Facebook Post', buyerDescription: 'Add engaging comments to your Facebook posts', providerDescription: 'Write and post a comment on the specified Facebook post', buyerPrice: 10.00, providerPrice: 5.00, deliveryTime: '6-12 hours', requirements: ['Public Facebook post', 'Comment text provided'], icon: 'fab fa-facebook', category: 'engagement', urlPlaceholder: 'https://facebook.com/username/posts/post_id' }
-      ];
+      if (error) {
+        throw error;
+      }
+
+      // Transform database services to match frontend expectations
+      const transformedServices = services.map(service => {
+        const serviceId = `${service.platform}-${service.type}`;
+        const category = service.type === 'followers' || service.type === 'subscribers' ? 'growth' :
+                        service.type === 'likes' || service.type === 'comments' ? 'engagement' : 'reach';
+        
+        return {
+          id: serviceId,
+          platform: service.platform,
+          type: service.type,
+          name: `Perform ${service.title}`,
+          buyerName: service.title,
+          providerName: `Perform ${service.title}`,
+          buyerDescription: service.description,
+          providerDescription: `Complete the ${service.title.toLowerCase()} task using your personal account`,
+          buyerPrice: parseFloat(service.price),
+          providerPrice: parseFloat(service.price) * 0.5, // 50% of buyer price
+          deliveryTime: `${service.delivery_time} hours`,
+          requirements: ['Valid account', 'Public profile'],
+          icon: `fab fa-${service.platform}`,
+          category: category,
+          urlPlaceholder: getUrlPlaceholder(service.platform, service.type)
+        };
+      });
       
       const { platform, type } = req.query;
-      let filteredServices = predefinedServices;
+      let filteredServices = transformedServices;
       
       if (platform && platform !== 'all') {
         filteredServices = filteredServices.filter(service => service.platform === platform);
@@ -352,161 +359,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const selectedServiceIds = providerServices.map(item => item.service_id);
       
       // Get full service details for the selected services
-      const allServices = [
-        {
-          id: "instagram-followers",
-          platform: "instagram",
-          action_type: "followers",
-          name: "Instagram Followers",
-          description: "Follow the specified Instagram account using your personal account",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 95
-        },
-        {
-          id: "instagram-likes",
-          platform: "instagram",
-          action_type: "likes",
-          name: "Instagram Likes",
-          description: "Like the specified Instagram post using your personal account",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 98
-        },
-        {
-          id: "instagram-comments",
-          platform: "instagram",
-          action_type: "comments",
-          name: "Instagram Comments",
-          description: "Write and post a comment on the specified Instagram post",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 92
-        },
-        {
-          id: "youtube-subscribers",
-          platform: "youtube",
-          action_type: "subscribers",
-          name: "YouTube Subscribers",
-          description: "Subscribe to the specified YouTube channel using your personal account",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 90
-        },
-        {
-          id: "youtube-likes",
-          platform: "youtube",
-          action_type: "likes",
-          name: "YouTube Likes",
-          description: "Like the specified YouTube video using your personal account",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 95
-        },
-        {
-          id: "youtube-views",
-          platform: "youtube",
-          action_type: "views",
-          name: "YouTube Views",
-          description: "Watch the specified YouTube video completely (minimum 30 seconds)",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 88
-        },
-        {
-          id: "twitter-followers",
-          platform: "twitter",
-          action_type: "followers",
-          name: "Twitter Followers",
-          description: "Follow the specified X / Twitter account using your personal account",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 93
-        },
-        {
-          id: "twitter-likes",
-          platform: "twitter",
-          action_type: "likes",
-          name: "Twitter Likes",
-          description: "Like the specified X / Twitter tweet using your personal account",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 96
-        },
-        {
-          id: "twitter-retweets",
-          platform: "twitter",
-          action_type: "retweets",
-          name: "Twitter Retweets",
-          description: "Retweet the specified X / Twitter post using your personal account",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 89
-        },
-        {
-          id: "tiktok-followers",
-          platform: "tiktok",
-          action_type: "followers",
-          name: "TikTok Followers",
-          description: "Follow the specified TikTok account using your personal account",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 91
-        },
-        {
-          id: "tiktok-likes",
-          platform: "tiktok",
-          action_type: "likes",
-          name: "TikTok Likes",
-          description: "Like the specified TikTok video using your personal account",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 94
-        },
-        {
-          id: "tiktok-views",
-          platform: "tiktok",
-          action_type: "views",
-          name: "TikTok Views",
-          description: "Watch the specified TikTok video completely",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 87
-        },
-        {
-          id: "facebook-followers",
-          platform: "facebook",
-          action_type: "followers",
-          name: "Facebook Followers",
-          description: "Follow the specified Facebook page using your personal account",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 92
-        },
-        {
-          id: "facebook-likes",
-          platform: "facebook",
-          action_type: "likes",
-          name: "Facebook Likes",
-          description: "Like the specified Facebook post using your personal account",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 95
-        },
-        {
-          id: "facebook-shares",
-          platform: "facebook",
-          action_type: "shares",
-          name: "Facebook Shares",
-          description: "Share the specified Facebook post using your personal account",
-          buyerPrice: 10,
-          providerEarnings: 5,
-          success_rate: 88
-        }
-      ];
+      const { data: allServices, error: servicesError } = await supabase
+        .from('services')
+        .select('*')
+        .eq('status', 'active')
+        .order('platform', { ascending: true })
+        .order('type', { ascending: true });
+      
+      if (servicesError) throw servicesError;
+      
+      // Transform services to match expected format
+      const transformedServices = allServices.map(service => ({
+        id: `${service.platform}-${service.type}`,
+        platform: service.platform,
+        action_type: service.type,
+        name: service.title,
+        description: `Complete the ${service.title.toLowerCase()} task using your personal account`,
+        buyerPrice: parseFloat(service.price),
+        providerEarnings: parseFloat(service.price) * 0.5, // 50% of buyer price
+        success_rate: 95 // Default success rate
+      }));
       
       // Filter services to only include the ones the provider has selected
-      const selectedServices = allServices.filter(service => 
+      const selectedServices = transformedServices.filter(service => 
         selectedServiceIds.includes(service.id)
       );
       
@@ -1015,7 +890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quantity: cartItems.reduce((sum: number, item: any) => sum + item.quantity, 0),
         totalCost: totalAmount.toString(),
         providerEarnings: (totalAmount * 0.4).toString(), // 40% to provider
-        targetUrl: req.body.targetUrl || "https://example.com",
+        targetUrl: req.body.targetUrl,
         status: "pending"
       });
 
@@ -1325,9 +1200,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending')
       ]);
 
+      // Calculate total revenue from completed transactions
+      const { data: revenueData, error: revenueError } = await supabase
+        .from('transactions')
+        .select('amount')
+        .eq('status', 'completed');
+
+      const totalRevenue = revenueData?.reduce((sum, transaction) => 
+        sum + parseFloat(transaction.amount || '0'), 0) || 0;
+
       const stats = {
         totalUsers: totalUsers || 0,
-        totalRevenue: 25000.00, // Mock data for now
+        totalRevenue: totalRevenue,
         activeProviders: activeProviders || 0,
         activeBuyers: activeBuyers || 0,
         pendingModerations: pendingModerations || 0,
@@ -1439,9 +1323,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get available assignments for providers (filtered by their selected services)
   app.get("/api/provider/available-assignments", authenticateToken, async (req: any, res) => {
     try {
+      console.log('Provider available assignments requested for user:', req.user.id);
+      
       if (req.user.role !== 'provider') {
         return res.status(403).json({ message: "Provider access required" });
       }
+
+      // Convert string service IDs to platform/type mapping
+      // Fetch services from database to create dynamic mapping
+      const { data: services, error: servicesError } = await supabase
+        .from('services')
+        .select('platform, type')
+        .eq('status', 'active');
+
+      if (servicesError) {
+        console.error('Error fetching services for mapping:', servicesError);
+        throw servicesError;
+      }
+
+      // Create dynamic service mapping
+      const serviceMapping: { [key: string]: { platform: string; type: string } } = {};
+      services.forEach(service => {
+        const serviceId = `${service.platform}-${service.type}`;
+        serviceMapping[serviceId] = { platform: service.platform, type: service.type };
+      });
 
       // Get provider's selected services
       const { data: providerServices, error: servicesError } = await supabase
@@ -1452,41 +1357,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (servicesError) throw servicesError;
 
+      console.log('Provider services found:', providerServices);
+
       if (!providerServices || providerServices.length === 0) {
+        console.log('No provider services found, returning empty array');
         return res.json([]);
       }
 
-      const serviceIds = providerServices.map(ps => ps.service_id);
+      // Get the platform/type combinations for the provider's selected services
+      const providerPlatformTypes = providerServices
+        .map(ps => serviceMapping[ps.service_id])
+        .filter(Boolean);
 
-      // Get available assignments for the provider's services
-      const { data: availableAssignments, error: assignmentsError } = await supabase
-        .from('available_assignments')
-        .select(`
-          *,
-          transactions!inner(
-            id,
-            service_id,
-            quantity,
-            target_url,
-            comment_text,
-            buyer_id,
-            status
-          ),
-          services!inner(
-            id,
-            name,
-            platform,
-            action_type
-          )
-        `)
-        .eq('status', 'available')
-        .in('service_id', serviceIds)
-        .order('created_at', { ascending: false });
+      console.log('Provider platform types:', providerPlatformTypes);
 
-      if (assignmentsError) throw assignmentsError;
+      if (providerPlatformTypes.length === 0) {
+        console.log('No platform types found, returning empty array');
+        return res.json([]);
+      }
 
-      res.json(availableAssignments || []);
+      // Get available assignments that match the provider's platform/type combinations
+      let availableAssignments: any[] = [];
+      
+      for (const platformType of providerPlatformTypes) {
+        console.log('Searching for assignments with platform:', platformType.platform, 'type:', platformType.type);
+        
+        const { data: assignments, error: assignmentsError } = await supabase
+          .from('available_assignments')
+          .select(`
+            *,
+            transactions!inner(
+              id,
+              service_id,
+              quantity,
+              target_url,
+              comment_text,
+              buyer_id,
+              status
+            ),
+            services!inner(
+              id,
+              name,
+              platform,
+              action_type
+            )
+          `)
+          .eq('status', 'available')
+          .eq('platform', platformType.platform)
+          .eq('action_type', platformType.type)
+          .order('created_at', { ascending: false });
+
+        if (assignmentsError) {
+          console.error('Error fetching assignments:', assignmentsError);
+          throw assignmentsError;
+        }
+        
+        console.log('Found assignments for', platformType.platform, platformType.type, ':', assignments?.length || 0);
+        
+        if (assignments) {
+          availableAssignments = [...availableAssignments, ...assignments];
+        }
+      }
+
+      console.log('Total available assignments found:', availableAssignments.length);
+      res.json(availableAssignments);
     } catch (error) {
+      console.error('Error in provider available assignments:', error);
       res.status(500).json({ message: "Failed to fetch available assignments", error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
@@ -1770,10 +1706,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const transactionIds = transactions.map(t => t.id);
 
-      // Then get available assignments for these transactions
+      // Then get available assignments for these transactions with user info
       const { data: assignments, error } = await supabase
         .from('available_assignments')
-        .select('*')
+        .select(`
+          *,
+          users!claimed_by(full_name, email)
+        `)
         .in('transaction_id', transactionIds)
         .order('created_at', { ascending: false });
 
@@ -1795,8 +1734,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedAt: assignment.claimed_at || assignment.created_at, // Use claimed_at if available, otherwise created_at
         completedAt: assignment.claimed_at, // Use claimed_at as completion time
         providerId: assignment.claimed_by || null, // Use claimed_by as provider_id, null if not claimed
-        providerName: assignment.claimed_by ? 'Provider' : null, // Placeholder since we don't have user info
-        providerEmail: assignment.claimed_by ? 'provider@example.com' : null, // Placeholder
+        providerName: assignment.claimed_by ? (assignment.users?.full_name || 'Provider') : null,
+        providerEmail: assignment.claimed_by ? (assignment.users?.email || null) : null,
         verificationScreenshots: [] // available_assignments don't have verification screenshots yet
       })) || [];
 
@@ -2293,7 +2232,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('IntaSend webhook received:', JSON.stringify(req.body, null, 2));
       
       // Verify webhook signature/challenge
-      const webhookSecret = process.env.INTASEND_WEBHOOK_SECRET || 'sk_webhook_123456789abcdef';
+      const webhookSecret = process.env.INTASEND_WEBHOOK_SECRET;
+      if (!webhookSecret) {
+        console.error('INTASEND_WEBHOOK_SECRET environment variable is not set');
+        return res.status(500).json({ message: "Webhook secret not configured" });
+      }
       const challenge = req.headers['x-intasend-challenge'] || req.body.challenge;
       
       if (challenge !== webhookSecret) {
@@ -2898,23 +2841,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== AVAILABLE ASSIGNMENTS SYSTEM =====
 
-  // Get available assignments for providers (filtered by their selected services)
-  app.get("/api/provider/available-assignments", authenticateToken, async (req: any, res) => {
-    try {
-      if (req.user.role !== 'provider') {
-        return res.status(403).json({ message: "Provider access required" });
-      }
-
-      const { getAvailableAssignmentsForProvider } = await import('./available-assignments');
-      const assignments = await getAvailableAssignmentsForProvider(req.user.id);
-      res.json(assignments);
-
-    } catch (error: any) {
-      res.status(500).json({ message: "Failed to get available assignments", error: error.message });
-    }
-  });
 
   // Claim an available assignment
   app.post("/api/provider/claim-assignment/:assignmentId", authenticateToken, async (req: any, res) => {
@@ -2923,22 +2850,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Provider access required" });
       }
 
-      const { assignmentId } = req.params;
-      const { claimAssignment } = await import('./available-assignments');
-      
-      const result = await claimAssignment(parseInt(assignmentId), req.user.id);
-      
-      if (result.success) {
-        res.json({ 
-          message: "Assignment claimed successfully", 
-          assignment: result.assignment
-        });
-      } else {
-        res.status(400).json({ message: result.error });
+      const assignmentId = parseInt(req.params.assignmentId);
+
+      // Check if assignment is still available
+      const { data: assignment, error: assignmentError } = await supabase
+        .from('available_assignments')
+        .select('*')
+        .eq('id', assignmentId)
+        .eq('status', 'available')
+        .single();
+
+      if (assignmentError || !assignment) {
+        return res.status(404).json({ message: "Assignment not available or not found" });
       }
 
-    } catch (error: any) {
-      res.status(500).json({ message: "Failed to claim assignment", error: error.message });
+      // Update assignment status to claimed
+      const { error: updateError } = await supabase
+        .from('available_assignments')
+        .update({ 
+          status: 'claimed',
+          claimed_by: req.user.id,
+          claimed_at: new Date().toISOString()
+        })
+        .eq('id', assignmentId);
+
+      if (updateError) throw updateError;
+
+      // Create action assignment for the provider
+      const { error: actionError } = await supabase
+        .from('action_assignments')
+        .insert({
+          transaction_id: assignment.transaction_id,
+          provider_id: req.user.id,
+          platform: assignment.platform,
+          action_type: assignment.action_type,
+          target_url: assignment.target_url,
+          comment_text: assignment.comment_text,
+          status: 'assigned',
+          assigned_at: new Date().toISOString(),
+          provider_earnings: assignment.provider_earnings
+        });
+
+      if (actionError) throw actionError;
+
+      res.json({ message: "Assignment claimed successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to claim assignment", error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -3288,97 +3245,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw error;
       }
 
-      const buyerSubmissions = submissions?.map(submission => ({
-        id: submission.id,
-        platform: submission.platform,
-        actionType: submission.action_type,
-        status: submission.status,
-        targetUrl: submission.target_url,
-        commentText: submission.comment_text,
-        proofUrl: submission.proof_url,
-        createdAt: submission.created_at,
-        completedAt: submission.completed_at,
-        providerId: submission.provider_id,
-        providerName: submission.users?.name || 'Provider',
-        providerEmail: submission.users?.email || 'provider@example.com',
-        verificationScreenshots: submission.proof_url ? [
-          {
-            url: submission.proof_url,
-            description: 'Verification screenshot',
-            uploadedAt: submission.submitted_at
-          }
-        ] : []
-      })) || [];
-
-      res.json(buyerSubmissions);
-
-    } catch (error) {
-      res.status(500).json({ message: "Failed to get buyer submissions", error: (error as Error).message });
-    }
-  });
-
-  // Get all assignments for buyer
-  app.get("/api/buyer/assignments", authenticateToken, async (req: any, res) => {
-    try {
-      if (req.user.role !== 'buyer') {
-        return res.status(403).json({ message: "Buyer access required" });
-      }
-
-      // Get buyer assignments through transactions
-      console.log('Getting buyer assignments for user:', req.user.id);
-      
-      // First get all transactions for this buyer
-      const { data: transactions, error: transactionsError } = await supabase
-        .from('transactions')
-        .select('id')
-        .eq('buyer_id', req.user.id);
-
-      console.log('Buyer transactions:', transactions);
-
-      if (transactionsError) {
-        throw transactionsError;
-      }
-
-      if (!transactions || transactions.length === 0) {
-        return res.json([]);
-      }
-
-      const transactionIds = transactions.map(t => t.id);
-
-      // Then get available assignments for these transactions
-      const { data: assignments, error } = await supabase
-        .from('available_assignments')
-        .select('*')
-        .in('transaction_id', transactionIds)
-        .order('created_at', { ascending: false });
-
-      console.log('Buyer assignments query result:', { assignments, error });
-
-      if (error) {
-        throw error;
-      }
-
-      const buyerAssignments = assignments?.map(assignment => ({
+      const buyerSubmissions = submissions?.map(assignment => ({
         id: assignment.id,
         platform: assignment.platform,
         actionType: assignment.action_type,
         status: assignment.status,
         targetUrl: assignment.target_url,
         commentText: assignment.comment_text,
-        proofUrl: null, // available_assignments don't have proof_url
+        proofUrl: assignment.proof_url,
         createdAt: assignment.created_at,
-        assignedAt: assignment.claimed_at || assignment.created_at, // Use claimed_at if available, otherwise created_at
-        completedAt: assignment.claimed_at, // Use claimed_at as completion time
-        providerId: assignment.claimed_by || null, // Use claimed_by as provider_id, null if not claimed
-        providerName: assignment.claimed_by ? 'Provider' : null, // Placeholder since we don't have user info
-        providerEmail: assignment.claimed_by ? 'provider@example.com' : null, // Placeholder
+        completedAt: assignment.completed_at,
+        providerId: assignment.provider_id,
+        providerName: assignment.users?.name || 'Provider',
+        providerEmail: assignment.users?.email || null,
         verificationScreenshots: [] // available_assignments don't have verification screenshots yet
       })) || [];
 
-      res.json(buyerAssignments);
+      res.json(buyerSubmissions);
 
     } catch (error) {
-      res.status(500).json({ message: "Failed to get buyer assignments", error: (error as Error).message });
+      res.status(500).json({ message: "Failed to get buyer submissions", error: (error as Error).message });
     }
   });
 

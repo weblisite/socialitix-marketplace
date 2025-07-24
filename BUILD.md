@@ -67,13 +67,13 @@
 - id (VARCHAR, Primary Key)
 - platform (ENUM: 'facebook', 'instagram', 'twitter', 'tiktok', 'youtube')
 - type (ENUM: 'likes', 'comments', 'shares', 'follows', 'views')
-- name (VARCHAR)
+- title (VARCHAR)
 - description (TEXT)
 - price (DECIMAL)
 - min_quantity (INTEGER)
 - max_quantity (INTEGER)
 - delivery_time (INTEGER)
-- is_active (BOOLEAN)
+- status (ENUM: 'active', 'inactive')
 - created_at (TIMESTAMP)
 - updated_at (TIMESTAMP)
 ```
@@ -107,15 +107,11 @@
 - service_id (VARCHAR, Foreign Key)
 - platform (VARCHAR)
 - action_type (VARCHAR)
-- target_url (VARCHAR)
-- comment_text (TEXT)
 - quantity (INTEGER)
-- price_per_action (DECIMAL)
-- total_amount (DECIMAL)
-- status (ENUM: 'available', 'claimed', 'completed', 'expired')
+- status (ENUM: 'open', 'claimed', 'completed', 'cancelled')
 - claimed_by (INTEGER, Foreign Key)
 - claimed_at (TIMESTAMP)
-- expires_at (TIMESTAMP)
+- completed_at (TIMESTAMP)
 - created_at (TIMESTAMP)
 - updated_at (TIMESTAMP)
 ```
@@ -125,16 +121,32 @@
 - id (INTEGER, Primary Key, Auto-increment)
 - available_assignment_id (INTEGER, Foreign Key)
 - provider_id (INTEGER, Foreign Key)
-- transaction_id (INTEGER, Foreign Key)
-- platform (VARCHAR)
-- action_type (VARCHAR)
-- target_url (VARCHAR)
-- comment_text (TEXT)
-- status (ENUM: 'assigned', 'in_progress', 'completed', 'verified', 'rejected')
-- proof_url (VARCHAR)
-- assigned_at (TIMESTAMP)
+- status (ENUM: 'pending', 'in_progress', 'completed', 'rejected')
+- proof_data (JSONB)
+- submitted_at (TIMESTAMP)
 - completed_at (TIMESTAMP)
-- verified_at (TIMESTAMP)
+- created_at (TIMESTAMP)
+- updated_at (TIMESTAMP)
+```
+
+#### **provider_services**
+```sql
+- id (INTEGER, Primary Key, Auto-increment)
+- provider_id (INTEGER, Foreign Key)
+- service_id (VARCHAR, Foreign Key)
+- is_active (BOOLEAN)
+- created_at (TIMESTAMP)
+- updated_at (TIMESTAMP)
+```
+
+#### **social_media_accounts**
+```sql
+- id (INTEGER, Primary Key, Auto-increment)
+- user_id (INTEGER, Foreign Key)
+- platform (VARCHAR)
+- username (VARCHAR)
+- account_url (VARCHAR)
+- is_verified (BOOLEAN)
 - created_at (TIMESTAMP)
 - updated_at (TIMESTAMP)
 ```
@@ -142,10 +154,10 @@
 #### **verifications**
 ```sql
 - id (INTEGER, Primary Key, Auto-increment)
-- action_assignment_id (INTEGER, Foreign Key)
+- assignment_id (INTEGER, Foreign Key)
 - verifier_id (INTEGER, Foreign Key)
 - status (ENUM: 'pending', 'approved', 'rejected')
-- feedback (TEXT)
+- notes (TEXT)
 - created_at (TIMESTAMP)
 - updated_at (TIMESTAMP)
 ```
@@ -155,357 +167,188 @@
 - id (INTEGER, Primary Key, Auto-increment)
 - user_id (INTEGER, Foreign Key)
 - amount (DECIMAL)
-- status (ENUM: 'pending', 'approved', 'rejected', 'completed')
-- payment_method (VARCHAR)
-- payment_details (JSONB)
+- method (VARCHAR)
+- status (ENUM: 'pending', 'completed', 'failed')
+- reference (VARCHAR)
 - created_at (TIMESTAMP)
 - updated_at (TIMESTAMP)
 ```
 
+#### **credit_transactions**
+```sql
+- id (INTEGER, Primary Key, Auto-increment)
+- user_id (INTEGER, Foreign Key)
+- type (ENUM: 'credit', 'debit')
+- amount (DECIMAL)
+- description (TEXT)
+- reference (VARCHAR)
+- created_at (TIMESTAMP)
+```
+
+#### **platform_revenue**
+```sql
+- id (INTEGER, Primary Key, Auto-increment)
+- transaction_id (INTEGER, Foreign Key)
+- amount (DECIMAL)
+- percentage (DECIMAL)
+- created_at (TIMESTAMP)
+```
+
 ---
 
-## 🔄 **Complete Workflow**
+## 🔄 **Core Workflows**
 
-### **1. User Registration & Authentication**
-```
-1. User visits platform
-2. Signs up with email/password
-3. Email verification (optional)
-4. Profile creation with role selection
-5. JWT token generation for session management
-```
+### **1. Buyer Workflow**
+1. **Registration & Profile Setup**
+   - Sign up with email/password
+   - Complete profile with business information
+   - Verify email address
 
-### **2. Buyer Workflow**
-```
-1. **Browse Services**
-   - View available social media services
-   - Filter by platform, type, price
-   - Select service and quantity
+2. **Service Selection & Payment**
+   - Browse available services by platform and type
+   - Select service, quantity, and provide target URL
+   - Complete payment via IntaSend gateway
+   - Transaction recorded in database
 
-2. **Create Order**
-   - Fill order details (target URL, comments)
-   - Review pricing and terms
-   - Proceed to payment
+3. **Assignment Creation**
+   - System automatically creates available assignments
+   - Assignments visible to providers offering that service
+   - Buyers can track assignment status
 
-3. **Payment Processing**
-   - IntaSend payment gateway integration
-   - Secure payment processing
-   - Transaction recording in database
+4. **Verification & Completion**
+   - Review completed submissions from providers
+   - Approve or reject submissions
+   - System marks assignments as completed
 
-4. **Order Creation**
-   - Payment verification via webhooks
-   - Available assignments created for providers
-   - Order status updated to "active"
+### **2. Provider Workflow**
+1. **Registration & Service Selection**
+   - Sign up with email/password
+   - Select services they can provide
+   - Link social media accounts for verification
 
-5. **Monitor Progress**
-   - View order status and progress
-   - Track assignment completion
-   - Receive notifications
+2. **Assignment Discovery**
+   - View available assignments matching their services
+   - Filter by platform, type, and other criteria
+   - Claim assignments they can complete
 
-6. **Verify Submissions**
-   - Review provider submissions
-   - Approve or reject with feedback
-   - Trigger provider payments
-```
-
-### **3. Provider Workflow**
-```
-1. **Browse Available Assignments**
-   - View available tasks
-   - Filter by platform, type, earnings
-   - Select assignments to claim
-
-2. **Claim Assignments**
-   - Reserve assignments for completion
-   - Receive task details and requirements
-   - Start working on tasks
-
-3. **Complete Tasks**
-   - Perform social media actions
-   - Capture proof (screenshots/videos)
-   - Submit for verification
-
-4. **Get Paid**
+3. **Task Completion**
+   - Complete social media tasks (likes, comments, follows)
+   - Submit proof of completion
    - Wait for buyer verification
-   - Receive payment upon approval
-   - Track earnings and balance
-```
 
-### **4. Payment & Financial Flow**
-```
-1. **Buyer Payment**
-   - IntaSend processes payment
-   - Platform receives webhook confirmation
-   - Transaction marked as completed
+4. **Payment & Earnings**
+   - Receive payment upon verification
+   - Track earnings and withdrawal history
+   - Request withdrawals
 
-2. **Provider Earnings**
-   - 50% of buyer payment goes to provider
-   - 50% retained as platform fee
-   - Earnings credited to provider balance
+### **3. Admin Workflow**
+1. **Platform Management**
+   - Monitor transactions and revenue
+   - Manage user accounts and disputes
+   - Oversee verification process
 
-3. **Withdrawal Process**
-   - Providers request withdrawals
-   - Admin approval process
-   - Payment processing to provider
-```
+2. **Service Management**
+   - Add/edit/remove services
+   - Set pricing and delivery times
+   - Monitor service performance
+
+3. **Moderation & Support**
+   - Handle user reports and disputes
+   - Review flagged content
+   - Provide customer support
 
 ---
 
 ## 🛠️ **Key Features Implemented**
 
-### **Authentication & User Management**
-- ✅ Supabase Auth integration
-- ✅ JWT token-based authentication
-- ✅ Role-based access control (buyer, provider, admin)
-- ✅ User profile management
-- ✅ Email verification system
+### **✅ Authentication & User Management**
+- **Supabase Auth Integration**: JWT-based authentication
+- **Role-based Access Control**: Buyer, Provider, Admin roles
+- **Profile Management**: Complete user profiles with verification
+- **Social Media Account Linking**: Providers can link their accounts
 
-### **Payment System**
-- ✅ IntaSend payment gateway integration
-- ✅ Secure payment processing
-- ✅ Webhook handling for payment confirmation
-- ✅ Transaction recording and management
-- ✅ Payment status tracking
+### **✅ Payment Processing**
+- **IntaSend Integration**: Secure payment gateway
+- **Webhook Processing**: Real-time payment status updates
+- **Transaction Management**: Complete payment flow tracking
+- **Revenue Tracking**: Platform fee calculation and recording
 
-### **Order Management**
-- ✅ Service catalog with pricing
-- ✅ Order creation and management
-- ✅ Assignment generation system
-- ✅ Order status tracking
-- ✅ Progress monitoring
+### **✅ Service Management**
+- **Dynamic Service Database**: All services stored in database
+- **Service Mapping**: Dynamic mapping between string IDs and platform/type
+- **Provider Service Selection**: Providers can select which services to offer
+- **Service Filtering**: Advanced filtering by platform, type, and status
 
-### **Assignment System**
-- ✅ Available assignments creation
-- ✅ Provider assignment claiming
-- ✅ Task completion workflow
-- ✅ Proof submission system
-- ✅ Assignment status management
+### **✅ Assignment System**
+- **Available Assignments**: Automatic creation after successful payments
+- **Assignment Claiming**: Providers can claim available tasks
+- **Status Tracking**: Complete assignment lifecycle management
+- **Proof Submission**: Secure proof upload and verification
 
-### **Verification System**
-- ✅ Buyer verification of submissions
-- ✅ Approval/rejection workflow
-- ✅ Feedback system
-- ✅ Quality assurance process
+### **✅ Verification System**
+- **Manual Verification**: Buyers can verify provider submissions
+- **AI Verification**: Framework for automated verification (ready for implementation)
+- **Verification Tracking**: Complete audit trail of verifications
+- **Dispute Resolution**: System for handling verification disputes
 
-### **Financial Management**
-- ✅ Provider earnings tracking
-- ✅ Balance management
-- ✅ Withdrawal requests
-- ✅ Payment processing
-- ✅ Revenue tracking
+### **✅ Dashboard & Analytics**
+- **Buyer Dashboard**: Track orders, view submissions, manage payments
+- **Provider Dashboard**: View available assignments, track earnings
+- **Admin Dashboard**: Platform analytics, user management, revenue tracking
+- **Real-time Updates**: Live status updates across all dashboards
 
-### **Dashboard & Analytics**
-- ✅ Buyer dashboard with order tracking
-- ✅ Provider dashboard with earnings
-- ✅ Admin dashboard for management
-- ✅ Real-time statistics
-- ✅ Transaction history
+### **✅ Email Notifications**
+- **Real-time Notifications**: Database-driven notification system
+- **Email Templates**: Structured email notifications
+- **User Preferences**: Configurable notification settings
 
-### **Communication & Notifications**
-- ✅ Email notifications
-- ✅ In-app notifications
-- ✅ Status updates
-- ✅ Payment confirmations
+### **✅ Withdrawal System**
+- **Earnings Tracking**: Complete earnings calculation
+- **Withdrawal Requests**: Secure withdrawal processing
+- **Payment Methods**: Multiple withdrawal options
+- **Transaction History**: Complete financial audit trail
 
 ---
 
-## 🔧 **Technical Implementation Details**
+## 🔧 **Recent Improvements & Fixes**
 
-### **API Endpoints**
+### **✅ Mock Data & Placeholder Cleanup (COMPLETE)**
+- **Provider Email Placeholders**: Replaced hardcoded `'provider@example.com'` with actual user data lookup
+- **Admin Dashboard Stats**: Replaced hardcoded `totalRevenue` with database calculation
+- **Email Notifications**: Replaced mock notifications with API-driven data
+- **Service Definitions**: Replaced hardcoded services with database queries
+- **Service Mapping**: Made dynamic based on database services
+- **Social Media Verification**: Removed mock API functions, focused on manual/AI verification
+- **Webhook Secrets**: Removed hardcoded fallbacks, made environment variables required
+- **Target URLs**: Removed hardcoded `example.com` fallbacks
 
-#### **Authentication**
-- `POST /api/auth/signup` - User registration
-- `POST /api/auth/login` - User login
-- `POST /api/auth/create-profile` - Profile creation
-- `GET /api/user/profile` - Get user profile
-- `PUT /api/user/profile` - Update user profile
+### **✅ Payment Processing Fixes**
+- **Transaction Amount Validation**: Fixed null amount constraint violations
+- **Payment Flow**: Complete end-to-end payment processing
+- **Webhook Integration**: Real-time payment status updates
+- **Error Handling**: Robust error handling and logging
 
-#### **Services**
-- `GET /api/services` - List available services
-- `GET /api/services/:id` - Get service details
+### **✅ Service Standardization**
+- **Facebook Likes**: Standardized "Facebook Page Likes" to "Facebook Likes" across platform
+- **Service Consistency**: Ensured consistent naming across database and frontend
+- **Service Mapping**: Dynamic service mapping based on database
 
-#### **Payments**
-- `POST /api/payment/create` - Create payment request
-- `POST /api/payment/verify` - Verify payment
-- `POST /api/payment/callback` - Webhook handler
-- `GET /api/transactions` - Get user transactions
+### **✅ Provider Assignment Visibility**
+- **Service ID Mapping**: Fixed service ID mismatch between tables
+- **Assignment Filtering**: Proper filtering based on provider service selection
+- **Duplicate Endpoint Removal**: Removed duplicate API endpoints
 
-#### **Assignments**
-- `GET /api/provider/assignments` - Get available assignments
-- `POST /api/provider/claim-assignment` - Claim assignment
-- `POST /api/provider/submit-proof` - Submit completion proof
-- `GET /api/buyer/assignments` - Get buyer assignments
-- `GET /api/buyer/submissions` - Get completed submissions
-
-#### **Verification**
-- `POST /api/verification/approve` - Approve submission
-- `POST /api/verification/reject` - Reject submission
-- `GET /api/verification/pending` - Get pending verifications
-
-#### **Withdrawals**
-- `POST /api/withdrawal/request` - Request withdrawal
-- `GET /api/withdrawal/history` - Get withdrawal history
-- `POST /api/admin/withdrawal/approve` - Approve withdrawal
-
-### **Database Migrations**
-- ✅ User authentication tables
-- ✅ Service catalog structure
-- ✅ Transaction management
-- ✅ Assignment system
-- ✅ Verification workflow
-- ✅ Withdrawal system
-- ✅ Platform revenue tracking
-
-### **Security Features**
-- ✅ JWT token authentication
-- ✅ Role-based access control
-- ✅ Input validation and sanitization
-- ✅ SQL injection prevention
-- ✅ XSS protection
-- ✅ CORS configuration
-- ✅ Rate limiting
-
-### **Error Handling**
-- ✅ Comprehensive error logging
-- ✅ User-friendly error messages
-- ✅ Graceful failure handling
-- ✅ Transaction rollback on errors
-- ✅ Payment failure recovery
+### **✅ Database Schema Improvements**
+- **Column Consistency**: Fixed column naming and data types
+- **Foreign Key Relationships**: Proper relationships between tables
+- **Indexing**: Optimized database performance
+- **Data Validation**: Enhanced data integrity constraints
 
 ---
 
 ## 🚀 **Deployment & Infrastructure**
 
-### **Development Environment**
-- ✅ Local development setup
-- ✅ Hot reload for frontend and backend
-- ✅ Environment variable management
-- ✅ Database seeding and testing
-
-### **Production Deployment**
-- ✅ Railway deployment configuration
-- ✅ Render deployment configuration
-- ✅ Docker containerization
-- ✅ Environment-specific configurations
-- ✅ SSL certificate management
-
-### **Monitoring & Logging**
-- ✅ Application logging
-- ✅ Error tracking
-- ✅ Performance monitoring
-- ✅ Database query optimization
-
----
-
-## 📈 **Business Model**
-
-### **Revenue Streams**
-1. **Platform Fees**: 50% of each transaction
-2. **Premium Features**: Advanced analytics, priority support
-3. **Verification Services**: Quality assurance fees
-4. **Withdrawal Fees**: Processing fees for withdrawals
-
-### **Pricing Strategy**
-- **Buyer Pricing**: Based on service type, platform, and quantity
-- **Provider Earnings**: 50% of buyer payment
-- **Platform Fee**: 50% of transaction value
-- **Withdrawal Fee**: Small percentage for processing
-
-### **Market Positioning**
-- **Target Market**: Small businesses, influencers, content creators
-- **Competitive Advantage**: Quality assurance, secure payments, user-friendly interface
-- **Growth Strategy**: Organic growth, referral programs, partnerships
-
----
-
-## 🔮 **Future Enhancements**
-
-### **Planned Features**
-- [ ] Real-time chat between buyers and providers
-- [ ] Advanced analytics and reporting
-- [ ] Mobile application (React Native)
-- [ ] API for third-party integrations
-- [ ] Automated quality verification
-- [ ] Bulk order processing
-- [ ] Affiliate program
-- [ ] Multi-language support
-
-### **Technical Improvements**
-- [ ] Microservices architecture
-- [ ] Redis caching layer
-- [ ] CDN for static assets
-- [ ] Advanced search and filtering
-- [ ] Real-time notifications
-- [ ] Advanced security features
-
----
-
-## 📋 **Testing & Quality Assurance**
-
-### **Testing Strategy**
-- ✅ Unit testing for core functions
-- ✅ Integration testing for API endpoints
-- ✅ End-to-end testing for user workflows
-- ✅ Payment flow testing
-- ✅ Security testing
-
-### **Quality Metrics**
-- ✅ Code coverage requirements
-- ✅ Performance benchmarks
-- ✅ Security compliance
-- ✅ User experience standards
-
----
-
-## 📚 **Documentation & Support**
-
-### **User Documentation**
-- ✅ User guides for buyers and providers
-- ✅ FAQ section
-- ✅ Video tutorials
-- ✅ Help center
-
-### **Developer Documentation**
-- ✅ API documentation
-- ✅ Code comments and documentation
-- ✅ Deployment guides
-- ✅ Troubleshooting guides
-
----
-
-## 🎉 **Current Status**
-
-### **✅ Completed Features**
-- Full authentication system
-- Payment processing with IntaSend
-- Complete order management workflow
-- Assignment claiming and completion system
-- Verification and approval process
-- Financial management and withdrawals
-- Comprehensive dashboards
-- Email notifications
-- Security and error handling
-
-### **🚀 Ready for Production**
-- All core features implemented and tested
-- Payment processing verified and working
-- Database schema optimized and migrated
-- Frontend and backend fully integrated
-- Deployment configurations ready
-- Security measures implemented
-
-### **📊 Platform Statistics**
-- **Supported Platforms**: Facebook, Instagram, Twitter, TikTok, YouTube
-- **Service Types**: Likes, Comments, Shares, Follows, Views
-- **Payment Methods**: M-Pesa, Card, Apple Pay, Google Pay, Bank Transfer
-- **User Roles**: Buyer, Provider, Admin
-- **Security**: JWT authentication, role-based access, input validation
-
----
-
-## 🔗 **Quick Start Guide**
-
-### **For Developers**
+### **Development Setup**
 ```bash
 # Clone repository
 git clone <repository-url>
@@ -516,31 +359,142 @@ npm install
 
 # Set up environment variables
 cp env.example .env
-# Edit .env with your Supabase and IntaSend credentials
+# Configure Supabase and IntaSend credentials
 
-# Start development server
-npm run dev
-
-# Access the application
-# Frontend: http://localhost:5000
-# Backend API: http://localhost:5000/api
+# Start development servers
+npm run dev:server  # Backend on port 5000
+npm run dev:client  # Frontend on port 3000
 ```
 
-### **For Users**
-1. Visit the platform
-2. Sign up as buyer or provider
-3. Complete profile setup
-4. Start using the platform
+### **Environment Variables**
+```env
+# Supabase Configuration
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# IntaSend Payment Gateway
+INTASEND_PUBLISHABLE_KEY=your_intasend_publishable_key
+INTASEND_SECRET_KEY=your_intasend_secret_key
+INTASEND_WEBHOOK_SECRET=your_webhook_secret
+
+# Application Configuration
+PORT=5000
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:3000
+```
+
+### **Production Deployment**
+- **Railway**: Ready for Railway deployment with `railway.json`
+- **Render**: Ready for Render deployment with `render.yaml`
+- **Docker**: Containerized with `Dockerfile`
+- **Environment**: Production environment configuration
 
 ---
 
-## 📞 **Support & Contact**
+## 📈 **Performance & Security**
 
-For technical support, feature requests, or bug reports:
-- **Email**: support@socialmarketplace.com
-- **Documentation**: [Platform Documentation]
-- **GitHub Issues**: [Repository Issues]
+### **Security Measures**
+- **JWT Authentication**: Secure token-based authentication
+- **Input Validation**: Comprehensive input sanitization
+- **SQL Injection Prevention**: Parameterized queries
+- **CORS Configuration**: Proper cross-origin resource sharing
+- **Environment Variables**: Secure credential management
+
+### **Performance Optimizations**
+- **Database Indexing**: Optimized query performance
+- **Caching**: React Query for efficient data fetching
+- **Lazy Loading**: Component and route lazy loading
+- **Image Optimization**: Optimized image handling
+- **Bundle Optimization**: Vite for fast builds
 
 ---
 
-*This document is maintained and updated regularly. Last updated: July 2025* 
+## 🔮 **Future Enhancements**
+
+### **Planned Features**
+- **AI Verification**: Automated content verification using AI
+- **Real-time Chat**: Provider-buyer communication
+- **Advanced Analytics**: Detailed performance metrics
+- **Mobile App**: React Native mobile application
+- **API Documentation**: Comprehensive API documentation
+- **Multi-language Support**: Internationalization
+- **Advanced Payment Methods**: Additional payment gateways
+
+### **Technical Improvements**
+- **Microservices Architecture**: Service decomposition
+- **Event-driven Architecture**: Event sourcing and CQRS
+- **Advanced Caching**: Redis integration
+- **Monitoring & Logging**: Comprehensive observability
+- **Automated Testing**: Unit, integration, and E2E tests
+
+---
+
+## 📝 **API Documentation**
+
+### **Authentication Endpoints**
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `GET /api/auth/profile` - Get user profile
+- `PUT /api/auth/profile` - Update user profile
+
+### **Payment Endpoints**
+- `POST /api/payment/create` - Create payment
+- `POST /api/payment/callback` - Payment webhook
+- `GET /api/transactions` - Get user transactions
+
+### **Service Endpoints**
+- `GET /api/services` - Get all services
+- `GET /api/provider/services` - Get provider services
+- `POST /api/provider/services` - Update provider services
+
+### **Assignment Endpoints**
+- `GET /api/provider/available-assignments` - Get available assignments
+- `POST /api/assignments/claim` - Claim assignment
+- `POST /api/assignments/submit` - Submit assignment proof
+- `GET /api/buyer/assignments` - Get buyer assignments
+
+### **Verification Endpoints**
+- `POST /api/verification/review` - Review submission
+- `GET /api/verification/pending` - Get pending verifications
+
+### **Withdrawal Endpoints**
+- `POST /api/withdrawals/request` - Request withdrawal
+- `GET /api/withdrawals` - Get withdrawal history
+
+---
+
+## 🐛 **Known Issues & Limitations**
+
+### **Current Limitations**
+- **Social Media API Integration**: Manual verification only (AI verification framework ready)
+- **Payment Methods**: Limited to IntaSend supported methods
+- **Real-time Features**: Basic real-time updates (can be enhanced with WebSockets)
+- **Mobile Responsiveness**: Desktop-optimized (mobile improvements planned)
+
+### **Technical Debt**
+- **Test Coverage**: Limited automated testing
+- **Documentation**: API documentation needs expansion
+- **Error Handling**: Some edge cases need better handling
+- **Performance**: Database queries can be optimized further
+
+---
+
+## 📞 **Support & Maintenance**
+
+### **Development Team**
+- **Backend Development**: Node.js/TypeScript/Express.js
+- **Frontend Development**: React/TypeScript/Tailwind CSS
+- **Database Management**: PostgreSQL/Supabase
+- **DevOps**: Railway/Render deployment
+
+### **Maintenance Schedule**
+- **Daily**: Database backups and monitoring
+- **Weekly**: Security updates and performance reviews
+- **Monthly**: Feature updates and bug fixes
+- **Quarterly**: Major version updates and architecture reviews
+
+---
+
+*Last Updated: July 24, 2025*
+*Version: 2.0.0* 

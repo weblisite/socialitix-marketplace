@@ -405,7 +405,7 @@ export class SupabaseStorage implements IStorage {
       
       // Then by average completion time (ascending)
       if (a.average_completion_time !== b.average_completion_time) {
-        return (a.average_completion_time || 999999) - (b.average_completion_time || 999999);
+        return (a.average_completion_time || 86400000) - (b.average_completion_time || 86400000); // 24 hours in milliseconds
       }
       
       // Finally by last active time (descending)
