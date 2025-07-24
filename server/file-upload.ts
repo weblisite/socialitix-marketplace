@@ -1,19 +1,16 @@
 import multer from 'multer';
-import sharp from 'sharp';
-import path from 'path';
-import fs from 'fs/promises';
-import { randomUUID } from 'crypto';
+import { supabase } from './supabase';
+import { generateImageHash, checkImageReuse, storeImageHash } from './verification';
 
-// Configure multer for file uploads
+// Configure multer for memory storage
 const storage = multer.memoryStorage();
-
-export const upload = multer({
-  storage,
+const upload = multer({
+  storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 5 * 1024 * 1024, // 5MB limit
   },
   fileFilter: (req, file, cb) => {
-    // Allow only images
+    // Only allow image files
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
@@ -22,116 +19,83 @@ export const upload = multer({
   },
 });
 
-// Ensure upload directory exists
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'proofs');
-
-async function ensureUploadDir() {
+// Upload proof screenshot
+export async function uploadProofScreenshot(req: any, res: any) {
   try {
-    await fs.mkdir(UPLOAD_DIR, { recursive: true });
-  } catch (error) {
-    console.error('Error creating upload directory:', error);
-  }
-}
-
-// Process and save uploaded proof images
-export async function processProofImage(
-  buffer: Buffer,
-  originalName: string,
-  userId: number,
-  assignmentId: number
-): Promise<{ success: boolean; url?: string; error?: string }> {
-  try {
-    await ensureUploadDir();
-    
-    const fileExtension = path.extname(originalName).toLowerCase();
-    const fileName = `proof_${userId}_${assignmentId}_${randomUUID()}${fileExtension}`;
-    const filePath = path.join(UPLOAD_DIR, fileName);
-    
-    // Process image with Sharp
-    let processedBuffer = buffer;
-    
-    // Resize if image is too large
-    const metadata = await sharp(buffer).metadata();
-    if (metadata.width && metadata.width > 1920) {
-      processedBuffer = await sharp(buffer)
-        .resize(1920, null, { withoutEnlargement: true })
-        .jpeg({ quality: 85 })
-        .toBuffer();
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
     }
+
+    const { assignmentId } = req.body;
+    const providerId = req.user.id;
+
+    if (!assignmentId) {
+      return res.status(400).json({ message: 'Assignment ID is required' });
+    }
+
+    // Verify the assignment belongs to this provider
+    const { data: assignment, error: assignmentError } = await supabase
+      .from('action_assignments')
+      .select('id, status')
+      .eq('id', assignmentId)
+      .eq('provider_id', providerId)
+      .single();
+
+    if (assignmentError || !assignment) {
+      return res.status(404).json({ message: 'Assignment not found' });
+    }
+
+    if (assignment.status !== 'in_progress') {
+      return res.status(400).json({ message: 'Assignment is not in progress' });
+    }
+
+    // Generate image hash for fraud detection
+    const imageHash = generateImageHash(req.file.buffer);
     
-    // Add watermark or metadata for verification
-    processedBuffer = await sharp(processedBuffer)
-      .composite([{
-        input: Buffer.from(`<svg width="200" height="50">
-          <rect width="200" height="50" fill="rgba(0,0,0,0.7)" />
-          <text x="10" y="20" fill="white" font-size="12" font-family="Arial">EngageMarket Proof</text>
-          <text x="10" y="35" fill="white" font-size="10" font-family="Arial">${new Date().toISOString().split('T')[0]}</text>
-        </svg>`),
-        gravity: 'southeast'
-      }])
-      .toBuffer();
+    // Check for image reuse
+    const { isReused, flagCount } = await checkImageReuse(imageHash, providerId);
     
-    // Save processed image
-    await fs.writeFile(filePath, processedBuffer);
+    if (isReused) {
+      return res.status(400).json({ 
+        message: `Image has been reused ${flagCount + 1} times. This violates our terms of service.` 
+      });
+    }
+
+    // Upload to Supabase Storage
+    const fileName = `proofs/${providerId}/${assignmentId}/${Date.now()}-${req.file.originalname}`;
     
-    // Return relative URL path
-    const relativeUrl = `/uploads/proofs/${fileName}`;
-    return { success: true, url: relativeUrl };
-    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('proof-screenshots')
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Error uploading to Supabase Storage:', uploadError);
+      return res.status(500).json({ message: 'Failed to upload file' });
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('proof-screenshots')
+      .getPublicUrl(fileName);
+
+    const imageUrl = urlData.publicUrl;
+
+    // Store image hash for tracking
+    await storeImageHash(imageHash, parseInt(assignmentId), providerId);
+
+    res.json({ 
+      url: imageUrl,
+      message: 'File uploaded successfully' 
+    });
+
   } catch (error) {
-    console.error('Error processing proof image:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Image processing failed' 
-    };
+    console.error('Error uploading proof screenshot:', error);
+    res.status(500).json({ message: 'Failed to upload file' });
   }
 }
 
-// Validate proof image
-export function validateProofImage(file: Express.Multer.File): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-  
-  if (!file) {
-    errors.push('No file provided');
-    return { valid: false, errors };
-  }
-  
-  // Check file type
-  if (!file.mimetype.startsWith('image/')) {
-    errors.push('File must be an image');
-  }
-  
-  // Check file size (10MB)
-  if (file.size > 10 * 1024 * 1024) {
-    errors.push('File size must be less than 10MB');
-  }
-  
-  // Check supported formats
-  const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-  if (!supportedTypes.includes(file.mimetype)) {
-    errors.push('Supported formats: JPEG, JPG, PNG, WebP');
-  }
-  
-  return { valid: errors.length === 0, errors };
-}
-
-// Delete proof file
-export async function deleteProofFile(url: string): Promise<boolean> {
-  try {
-    const fileName = path.basename(url);
-    const filePath = path.join(UPLOAD_DIR, fileName);
-    await fs.unlink(filePath);
-    return true;
-  } catch (error) {
-    console.error('Error deleting proof file:', error);
-    return false;
-  }
-}
-
-// Get file size in human-readable format
-export function formatFileSize(bytes: number): string {
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  if (bytes === 0) return '0 Bytes';
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-}
+export { upload };

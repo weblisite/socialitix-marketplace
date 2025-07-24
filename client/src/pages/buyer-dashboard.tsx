@@ -11,6 +11,7 @@ import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import ReportModal from "@/components/report-modal";
 import PaymentModal from "@/components/payment-modal";
+import { PendingVerifications } from "@/components/pending-verifications";
 
 export default function BuyerDashboard() {
   const { user, logout } = useAuth();
@@ -22,16 +23,11 @@ export default function BuyerDashboard() {
   const [filters, setFilters] = useState({ platform: "all", type: "all" });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // Debug: Log user object to see its structure
-  console.log('User object in buyer dashboard:', user);
-  console.log('User name:', user?.name);
-  console.log('User full_name:', (user as any)?.full_name);
-  
   // State for checkout modal
   const [checkoutModal, setCheckoutModal] = useState({
     open: false,
     service: null as any,
-    quantity: 20,
+    quantity: 1,
     commentText: '',
     targetUrl: ''
   });
@@ -40,7 +36,7 @@ export default function BuyerDashboard() {
   const [paymentModal, setPaymentModal] = useState({
     open: false,
     service: null as any,
-    quantity: 20,
+    quantity: 1,
     totalCost: 0,
     targetUrl: '',
     commentText: ''
@@ -84,7 +80,7 @@ export default function BuyerDashboard() {
     setCheckoutModal({ 
       open: true, 
       service, 
-      quantity: 20,
+      quantity: 1,
       commentText: '', 
       targetUrl: '' 
     });
@@ -105,7 +101,7 @@ export default function BuyerDashboard() {
       commentText: checkoutModal.commentText
     });
     
-    setCheckoutModal({ open: false, service: null, quantity: 20, commentText: '', targetUrl: '' });
+    setCheckoutModal({ open: false, service: null, quantity: 1, commentText: '', targetUrl: '' });
   };
 
   // Handle payment success
@@ -118,11 +114,11 @@ export default function BuyerDashboard() {
     });
   };
 
-  // Fetch assignments for completed orders
-  const { data: assignments = [] } = useQuery({
-    queryKey: ['/api/buyer/assignments'],
+  // Fetch submissions from providers for verification
+  const { data: submissions = [] } = useQuery({
+    queryKey: ['/api/buyer/submissions'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/buyer/assignments');
+      const response = await apiRequest('GET', '/api/buyer/submissions');
       return response.json();
     },
   });
@@ -142,22 +138,22 @@ export default function BuyerDashboard() {
   };
 
   const ServiceCard = ({ service }: { service: any }) => {
-    const [quantity, setQuantity] = useState(20);
+    const [quantity, setQuantity] = useState(1);
     const [commentText, setCommentText] = useState("");
     const [targetUrl, setTargetUrl] = useState("");
 
     const handleQuantityChange = (value: number | string) => {
       const numValue = typeof value === 'string' ? parseInt(value) : value;
-      setQuantity(Math.max(20, Math.min(10000, numValue)));
+      setQuantity(Math.max(1, Math.min(10000, numValue)));
     };
 
     const handleCustomQuantityChange = (value: string) => {
-      const numValue = parseInt(value) || 20;
-      setQuantity(Math.max(20, Math.min(10000, numValue)));
+      const numValue = parseInt(value) || 1;
+      setQuantity(Math.max(1, Math.min(10000, numValue)));
     };
 
     return (
-      <Card className="bg-gray-900/50 border-gray-800 hover:border-lime-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-lime-500/10 group">
+      <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 hover:border-lime-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-lime-500/10 group">
         <CardContent className="p-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center space-x-3">
@@ -168,14 +164,14 @@ export default function BuyerDashboard() {
                 <h3 className="text-lg font-semibold text-white capitalize">
                   {service.platform} {service.type}
                 </h3>
-                <p className="text-gray-400 text-sm">{service.buyerDescription}</p>
+                <p className="text-gray-300 text-sm">{service.buyerDescription}</p>
               </div>
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-lime-500">
                 {service.buyerPrice} KES
               </div>
-              <div className="text-gray-400 text-sm">per action</div>
+              <div className="text-gray-300 text-sm">per action</div>
             </div>
           </div>
 
@@ -296,6 +292,37 @@ export default function BuyerDashboard() {
     );
   };
 
+  // Redirect to landing page if not authenticated
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-lime-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to landing page if user is not a buyer
+  if (user.role !== 'buyer') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white flex items-center justify-center">
+        <div className="text-center">
+          <i className="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-4"></i>
+          <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-gray-400 mb-4">You don't have permission to access the buyer dashboard.</p>
+          <button 
+            onClick={() => window.location.href = '/'}
+            className="bg-lime-500 hover:bg-lime-600 text-white px-6 py-2 rounded-lg transition-colors"
+          >
+            Go to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white">
       {/* Mobile Header */}
@@ -314,7 +341,7 @@ export default function BuyerDashboard() {
               <h2 className="text-lg font-bold bg-gradient-to-r from-lime-500 to-lime-400 bg-clip-text text-transparent">
                 Buyer Dashboard
               </h2>
-              <p className="text-xs text-white">Welcome, {user?.name}</p>
+              <p className="text-xs text-gray-400">Welcome, {user?.full_name || user?.name || 'User'}</p>
             </div>
           </div>
           <Button 
@@ -331,16 +358,18 @@ export default function BuyerDashboard() {
 
       <div className="flex flex-col lg:flex-row">
         {/* Sidebar */}
-        <div className={`${mobileMenuOpen ? 'block' : 'hidden'} lg:block w-full lg:w-64 bg-gray-900/90 backdrop-blur-lg border-r border-gray-800 min-h-screen lg:min-h-0 lg:relative fixed lg:static top-0 left-0 z-40 lg:z-auto pt-16 lg:pt-0`}>
+        <div className={`${mobileMenuOpen ? 'block' : 'hidden'} lg:block w-full lg:w-64 bg-gray-900/90 backdrop-blur-lg border-r border-gray-800 min-h-screen lg:h-screen lg:fixed lg:top-0 lg:left-0 top-0 left-0 z-40 lg:z-auto pt-16 lg:pt-0 lg:flex lg:flex-col`}>
           {/* Desktop Header */}
           <div className="hidden lg:block p-6 border-b border-gray-800">
-            <h2 className="text-xl font-bold bg-gradient-to-r from-lime-500 to-lime-400 bg-clip-text text-transparent">
-              Buyer Dashboard
-            </h2>
-            <p className="text-sm text-white mt-1">Welcome, {user?.name}</p>
+            <div>
+              <h2 className="text-xl font-bold bg-gradient-to-r from-lime-500 to-lime-400 bg-clip-text text-transparent">
+                Buyer Dashboard
+              </h2>
+                              <p className="text-sm text-gray-300 mt-1">Welcome, {user?.full_name || user?.name || 'User'}</p>
+            </div>
           </div>
           
-          <nav className="mt-6 p-4">
+          <nav className="mt-6 p-4 lg:flex lg:flex-col lg:flex-1 lg:justify-between">
             <button
               onClick={() => {
                 setActiveTab("overview");
@@ -387,12 +416,38 @@ export default function BuyerDashboard() {
             </button>
             
             <button
+              onClick={() => {
+                setActiveTab("verifications");
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center px-4 py-3 text-left text-sm rounded-xl transition-all duration-200 mt-2 ${
+                activeTab === "verifications" 
+                  ? "bg-gradient-to-r from-lime-500/20 to-lime-600/20 text-lime-400 border border-lime-500/30" 
+                  : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-300"
+              }`}
+            >
+              <i className="fas fa-check-circle mr-3 text-lg"></i>
+              Verifications
+            </button>
+            
+            <button
               onClick={logout}
               className="w-full flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800/50 hover:text-gray-300 text-left text-sm rounded-xl transition-all duration-200 mt-2 lg:hidden"
             >
               <i className="fas fa-sign-out-alt mr-3 text-lg"></i>
               Logout
             </button>
+            
+            {/* Desktop Logout Button */}
+            <div className="hidden lg:block mt-auto pt-6 border-t border-gray-800">
+              <button
+                onClick={logout}
+                className="w-full flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800/50 hover:text-gray-300 text-left text-sm rounded-xl transition-all duration-200"
+              >
+                <i className="fas fa-sign-out-alt mr-3 text-lg"></i>
+                Logout
+              </button>
+            </div>
           </nav>
         </div>
 
@@ -405,37 +460,39 @@ export default function BuyerDashboard() {
         )}
 
         {/* Main Content */}
-        <div className="flex-1 p-4 sm:p-6 lg:p-8">
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 lg:ml-64">
           {activeTab === "overview" && (
             <>
-              <div className="mb-8">
-                <h1 className="text-3xl font-bold text-white mb-2">Dashboard Overview</h1>
-                <p className="text-gray-400">Monitor your social media growth and order performance</p>
+              <div className="mb-8 flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold text-white mb-2">Dashboard Overview</h1>
+                  <p className="text-gray-300">Monitor your social media growth and order performance</p>
+                </div>
               </div>
 
               {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <Card className="bg-black/80 border-gray-800 hover:border-lime-500/30 transition-all duration-300">
+                <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 hover:border-lime-500/30 transition-all duration-300">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-gray-300 font-medium text-sm">Total Orders</p>
-                        <p className="text-3xl font-bold text-white">{transactions?.length || 0}</p>
+                        <p className="text-gray-300 text-sm font-medium">Total Orders</p>
+                        <p className="text-3xl font-bold text-white">{transactions.length}</p>
                       </div>
                       <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                        <i className="fas fa-shopping-cart text-white text-xl"></i>
+                        <i className="fas fa-shopping-bag text-white text-xl"></i>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-black/80 border-gray-800 hover:border-lime-500/30 transition-all duration-300">
+                <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 hover:border-lime-500/30 transition-all duration-300">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-gray-300 font-medium text-sm">Active Orders</p>
-                        <p className="text-3xl font-bold text-yellow-500">
-                          {transactions?.filter((t: any) => t.status === 'in_progress').length || 0}
+                        <p className="text-gray-300 text-sm font-medium">Active Orders</p>
+                        <p className="text-3xl font-bold text-white">
+                          {transactions.filter((t: any) => t.status === 'in_progress').length}
                         </p>
                       </div>
                       <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center">
@@ -445,13 +502,13 @@ export default function BuyerDashboard() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-black/80 border-gray-800 hover:border-lime-500/30 transition-all duration-300">
+                <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 hover:border-lime-500/30 transition-all duration-300">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-gray-300 font-medium text-sm">Completed</p>
-                        <p className="text-3xl font-bold text-green-500">
-                          {transactions?.filter((t: any) => t.status === 'completed').length || 0}
+                        <p className="text-gray-300 text-sm font-medium">Completed</p>
+                        <p className="text-3xl font-bold text-white">
+                          {transactions.filter((t: any) => t.status === 'completed').length}
                         </p>
                       </div>
                       <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
@@ -461,13 +518,13 @@ export default function BuyerDashboard() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-black/80 border-gray-800 hover:border-lime-500/30 transition-all duration-300">
+                <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 hover:border-lime-500/30 transition-all duration-300">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-gray-300 font-medium text-sm">Total Spent</p>
+                        <p className="text-gray-300 text-sm font-medium">Total Spent</p>
                         <p className="text-3xl font-bold text-lime-500">
-                          {transactions?.reduce((sum: number, t: any) => sum + (t.total_cost || 0), 0).toFixed(2) || '0.00'} KES
+                          {transactions.reduce((sum: number, t: any) => sum + (t.total_cost || 0), 0).toFixed(2)} KES
                         </p>
                       </div>
                       <div className="w-12 h-12 bg-gradient-to-br from-lime-500 to-lime-600 rounded-xl flex items-center justify-center">
@@ -479,10 +536,10 @@ export default function BuyerDashboard() {
               </div>
 
               {/* Recent Activity */}
-              <Card className="bg-black/80 border-gray-800">
+              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700">
                 <CardContent className="p-6">
                   <h3 className="text-xl font-semibold text-white mb-4">Recent Activity</h3>
-                  {!transactions || transactions.length === 0 ? (
+                  {transactions.length === 0 ? (
                     <div className="text-center py-8">
                       <i className="fas fa-chart-line text-4xl text-gray-500 mb-4"></i>
                       <p className="text-gray-300 text-lg">No orders yet. Start by browsing our services!</p>
@@ -490,14 +547,14 @@ export default function BuyerDashboard() {
                   ) : (
                     <div className="space-y-4">
                       {transactions.slice(0, 5).map((transaction: any) => (
-                        <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-900/80 rounded-xl border border-gray-700">
+                        <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-700/50 rounded-xl border border-gray-600">
                           <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 bg-gradient-to-br from-lime-500 to-lime-600 rounded-lg flex items-center justify-center">
                               <i className="fas fa-shopping-cart text-white"></i>
                             </div>
                             <div>
                               <p className="text-white font-medium capitalize">
-                                {transaction.service_name || 'Unknown Service'}
+                                {transaction.platform} {transaction.action_type}
                               </p>
                               <p className="text-gray-300 text-sm">
                                 {new Date(transaction.created_at).toLocaleDateString()}
@@ -505,17 +562,17 @@ export default function BuyerDashboard() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-lime-500 font-bold">{transaction.total_cost || 0} KES</p>
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            <p className="text-lime-500 font-semibold">
+                              {transaction.total_cost} KES
+                            </p>
+                            <span className={`text-xs px-2 py-1 rounded-full ${
                               transaction.status === 'completed' 
-                                ? 'bg-green-900/50 text-green-300 border border-green-500/30'
+                                ? 'bg-green-500/20 text-green-400' 
                                 : transaction.status === 'in_progress'
-                                ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-500/30'
-                                : 'bg-gray-900/50 text-gray-300 border border-gray-500/30'
+                                ? 'bg-yellow-500/20 text-yellow-400'
+                                : 'bg-gray-500/20 text-gray-300'
                             }`}>
-                              {transaction.status === 'completed' ? 'Completed' : 
-                               transaction.status === 'in_progress' ? 'In Progress' : 
-                               transaction.status}
+                              {transaction.status}
                             </span>
                           </div>
                         </div>
@@ -531,11 +588,11 @@ export default function BuyerDashboard() {
             <>
               <div className="mb-8">
                 <h1 className="text-3xl font-bold text-white mb-2">Browse Services</h1>
-                <p className="text-gray-400">Choose from our premium social media engagement services</p>
+                <p className="text-gray-300">Choose from our premium social media engagement services</p>
               </div>
 
               {/* Filters */}
-              <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800 mb-8">
+              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 mb-8">
                 <CardContent className="p-6">
                   <div className="flex flex-col sm:flex-row gap-4">
                     <div className="flex-1">
@@ -577,7 +634,7 @@ export default function BuyerDashboard() {
               {servicesLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <Card key={i} className="bg-gray-900/50 border-gray-800 animate-pulse">
+                    <Card key={i} className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 animate-pulse">
                       <CardContent className="p-6">
                         <div className="space-y-4">
                           <div className="flex items-center space-x-3">
@@ -606,15 +663,26 @@ export default function BuyerDashboard() {
             </>
           )}
 
+          {activeTab === "verifications" && (
+            <>
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold text-white mb-2">Verifications</h1>
+                <p className="text-gray-300">Review and verify proof submissions from providers</p>
+              </div>
+              
+              <PendingVerifications />
+            </>
+          )}
+
           {activeTab === "orders" && (
             <>
               <div className="mb-8">
                 <h1 className="text-3xl font-bold text-white mb-2">Orders & Assignments</h1>
-                <p className="text-gray-400">Track your orders and view assignment progress</p>
+                <p className="text-gray-300">Track your orders and view assignment progress</p>
               </div>
 
               {/* Sub-tabs */}
-              <div className="flex space-x-1 mb-6 bg-gray-800/50 p-1 rounded-xl">
+              <div className="flex space-x-1 mb-6 bg-gray-700/50 p-1 rounded-xl">
                 <button
                   onClick={() => setOrdersSubTab("transactions")}
                   className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -640,18 +708,18 @@ export default function BuyerDashboard() {
               </div>
 
               {ordersSubTab === "transactions" && (
-                <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800">
+                <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700">
                   <CardContent className="p-6">
                     <h3 className="text-xl font-semibold text-white mb-4">Order History</h3>
                     {transactions.length === 0 ? (
                       <div className="text-center py-8">
-                        <i className="fas fa-shopping-cart text-4xl text-gray-600 mb-4"></i>
-                        <p className="text-gray-400">No orders yet. Start by browsing our services!</p>
+                        <i className="fas fa-shopping-cart text-4xl text-gray-500 mb-4"></i>
+                        <p className="text-gray-300">No orders yet. Start by browsing our services!</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
                         {transactions.map((transaction: any) => (
-                          <div key={transaction.id} className="p-4 bg-gray-800/50 rounded-xl border border-gray-700 hover:border-lime-500/30 transition-all duration-300">
+                          <div key={transaction.id} className="p-4 bg-gray-700/50 rounded-xl border border-gray-600 hover:border-lime-500/30 transition-all duration-300">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center space-x-3">
                                 <div className="w-10 h-10 bg-gradient-to-br from-lime-500 to-lime-600 rounded-lg flex items-center justify-center">
@@ -694,18 +762,19 @@ export default function BuyerDashboard() {
               )}
 
               {ordersSubTab === "assignments" && (
-                <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800">
+                <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700">
                   <CardContent className="p-6">
-                    <h3 className="text-xl font-semibold text-white mb-4">Assignment Progress</h3>
-                    {assignments.length === 0 ? (
+                    <h3 className="text-xl font-semibold text-white mb-4">Provider Submissions</h3>
+                    {submissions.length === 0 ? (
                       <div className="text-center py-8">
-                        <i className="fas fa-tasks text-4xl text-gray-500 mb-4"></i>
-                        <p className="text-gray-300 text-lg">No assignments yet. Complete an order to see assignments here!</p>
+                        <i className="fas fa-clipboard-check text-4xl text-gray-500 mb-4"></i>
+                        <p className="text-gray-300 text-lg">No completed submissions yet. Providers will submit completed work here for your verification!</p>
+                        <p className="text-gray-400 text-sm mt-2">Once providers complete your orders, you'll see their submissions here for approval.</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {assignments.map((assignment: any) => (
-                          <div key={assignment.id} className="p-4 bg-black/80 rounded-xl border border-gray-700 hover:border-lime-500/30 transition-all duration-300">
+                        {submissions.map((submission: any) => (
+                          <div key={submission.id} className="p-4 bg-gray-700/50 rounded-xl border border-gray-600 hover:border-lime-500/30 transition-all duration-300">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center space-x-3">
                                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
@@ -713,28 +782,28 @@ export default function BuyerDashboard() {
                                 </div>
                                 <div>
                                   <p className="text-white font-medium">
-                                    Assignment #{assignment.id}
+                                    Submission #{submission.id}
                                   </p>
                                   <p className="text-gray-300 text-sm">
-                                    {new Date(assignment.assigned_at).toLocaleDateString()}
+                                    {new Date(submission.submitted_at).toLocaleDateString()}
                                   </p>
                                 </div>
                               </div>
                               <div className="text-right">
                                 <span className={`text-xs px-3 py-1 rounded-full ${
-                                  assignment.status === 'completed' 
+                                  submission.status === 'completed' 
                                     ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
-                                    : assignment.status === 'in_progress'
+                                    : submission.status === 'in_progress'
                                     ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
                                     : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
                                 }`}>
-                                  {assignment.status}
+                                  {submission.status}
                                 </span>
                               </div>
                             </div>
                             <div className="text-sm text-gray-300">
-                              <p>Platform: {assignment.platform}</p>
-                              <p>Action: {assignment.action_type}</p>
+                              <p>Platform: {submission.platform}</p>
+                              <p>Action: {submission.action_type}</p>
                             </div>
                           </div>
                         ))}

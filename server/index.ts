@@ -2,6 +2,47 @@ import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { initializeCronJobs } from "./cron-jobs";
+import { supabase } from "./supabase";
+
+// Database initialization function
+async function initializeDatabase() {
+  try {
+    console.log('Initializing database...');
+    
+    // Check if provider_services table exists
+    const { error: servicesError } = await supabase
+      .from('provider_services')
+      .select('*')
+      .limit(1);
+    
+    if (servicesError && servicesError.code === '42P01') {
+      console.log('Creating provider_services table...');
+      // Table doesn't exist, we'll handle this in the routes when needed
+      console.log('provider_services table will be created when first accessed');
+    } else {
+      console.log('✓ provider_services table exists');
+    }
+    
+    // Check if available_assignments table exists
+    const { error: assignmentsError } = await supabase
+      .from('available_assignments')
+      .select('*')
+      .limit(1);
+    
+    if (assignmentsError && assignmentsError.code === '42P01') {
+      console.log('Creating available_assignments table...');
+      // Table doesn't exist, we'll handle this in the routes when needed
+      console.log('available_assignments table will be created when first accessed');
+    } else {
+      console.log('✓ available_assignments table exists');
+    }
+    
+    console.log('Database initialization completed');
+  } catch (error) {
+    console.error('Database initialization failed:', error);
+  }
+}
 
 const app = express();
 app.use(express.json());
@@ -62,7 +103,13 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Initialize database first
+  await initializeDatabase();
+  
   const server = await registerRoutes(app);
+  
+  // Initialize cron jobs for automated tasks
+  initializeCronJobs();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

@@ -55,10 +55,15 @@ export interface Withdrawal {
   amount: string;
   fee: string;
   net_amount: string;
-  status: string; // 'pending', 'processing', 'completed', 'failed'
-  bank_details?: any;
-  payment_id?: string;
+  status: string; // 'pending', 'processing', 'completed', 'failed', 'cancelled'
+  payment_method: string; // 'mpesa', 'airtel_money', 'bank_transfer', 'paypal'
+  payment_details: any; // JSON object with payment method specific details
+  admin_notes?: string;
+  processed_by?: number;
+  processed_at?: string;
+  external_payment_id?: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface CartItem {
@@ -250,11 +255,15 @@ export const insertTransactionSchema = z.object({
 export const insertWithdrawalSchema = z.object({
   provider_id: z.number(),
   amount: z.string(),
-  fee: z.string(),
+  fee: z.string().optional(),
   net_amount: z.string(),
   status: z.string().optional(),
-  bank_details: z.any().optional(),
-  payment_id: z.string().optional()
+  payment_method: z.string(),
+  payment_details: z.any(),
+  admin_notes: z.string().optional(),
+  processed_by: z.number().optional(),
+  processed_at: z.string().optional(),
+  external_payment_id: z.string().optional()
 });
 
 export const insertCartItemSchema = z.object({

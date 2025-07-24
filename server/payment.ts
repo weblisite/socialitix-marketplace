@@ -71,7 +71,7 @@ export async function createPaymentRequest(paymentData: PaymentRequest): Promise
         phone: paymentData.phone,
         reference: paymentData.reference,
         callback_url: paymentData.callback_url || `${process.env.BASE_URL || 'http://localhost:5000'}/api/payment/callback`,
-        redirect_url: `${process.env.BASE_URL || 'http://localhost:3000'}/payment/success`
+        redirect_url: `${process.env.BASE_URL || 'http://localhost:5000'}/payment/success`
       })
     });
 
@@ -249,27 +249,47 @@ export async function logPaymentTransaction(
   status: string,
   reference: string,
   serviceId?: string,
-  quantity: number = 20
+  quantity: number = 1,
+  targetUrl?: string,
+  commentText?: string
 ): Promise<void> {
   try {
+    // First, get a provider for this service (for now, assign to provider ID 1 as default)
+    // In a real system, you would implement provider selection logic here
+    const providerId = 1; // Default provider - you can implement provider selection logic later
+    
     const transactionData = {
       buyer_id: userId,
-      service_id: serviceId ? parseInt(serviceId) : 0,
+      provider_id: providerId, // Add the required provider_id field
+      service_id: serviceId,
       quantity: quantity,
-      total_cost: amount.toString(),
-      comment_text: '',
-      target_url: '',
+      amount: amount, // Add the required amount field (NOT NULL constraint)
+      total_cost: amount.toString(), // Keep total_cost for compatibility
+      comment_text: commentText || '',
+      target_url: targetUrl || '',
       status: status === 'completed' ? 'completed' : 'pending',
       fulfilled_quantity: 0,
       payment_id: paymentId
     };
 
-    await supabase.from('transactions').insert([transactionData]).select().single();
+    const { data: transaction, error } = await supabase
+      .from('transactions')
+      .insert([transactionData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating transaction:', error);
+      throw error;
+    }
+
+    console.log('Transaction created successfully:', transaction);
     
     // Note: Platform revenue is logged when service is verified, not when payment is collected
     // This ensures we only count revenue from actually delivered services
   } catch (error) {
     console.error('Error logging payment transaction:', error);
+    throw error; // Re-throw to handle in calling function
   }
 }
 

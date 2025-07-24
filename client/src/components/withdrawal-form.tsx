@@ -5,7 +5,8 @@ import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Loader2, Banknote, AlertCircle } from 'lucide-react';
+import { Textarea } from './ui/textarea';
+import { Loader2, Banknote, AlertCircle, CreditCard, Smartphone } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 
 interface WithdrawalFormProps {
@@ -14,10 +15,15 @@ interface WithdrawalFormProps {
   onCancel: () => void;
 }
 
-interface BankDetails {
-  account_number: string;
-  bank_code: string;
-  account_name: string;
+interface PaymentDetails {
+  // M-Pesa & Airtel Money
+  phone_number?: string;
+  // Bank Transfer
+  account_number?: string;
+  bank_code?: string;
+  account_name?: string;
+  // PayPal
+  paypal_email?: string;
 }
 
 // Kenyan banks supported by IntaSend
@@ -44,6 +50,13 @@ const KENYAN_BANKS = [
   { code: '20', name: 'Kenya Post Office Savings Bank' }
 ];
 
+const PAYMENT_METHODS = [
+  { value: 'mpesa', label: 'M-Pesa', icon: 'fas fa-mobile-alt', description: 'Mobile money transfer' },
+  { value: 'airtel_money', label: 'Airtel Money', icon: 'fas fa-mobile-alt', description: 'Mobile money transfer' },
+  { value: 'bank_transfer', label: 'Bank Transfer', icon: 'fas fa-university', description: 'Direct bank transfer' },
+  { value: 'paypal', label: 'PayPal', icon: 'fab fa-paypal', description: 'International payment' }
+];
+
 export function WithdrawalForm({
   currentBalance,
   onSuccess,
@@ -51,43 +64,82 @@ export function WithdrawalForm({
 }: WithdrawalFormProps) {
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState('');
-  const [bankDetails, setBankDetails] = useState<BankDetails>({
-    account_number: '',
-    bank_code: '',
-    account_name: ''
-  });
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentDetails, setPaymentDetails] = useState<PaymentDetails>({});
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Calculate withdrawal fee (50 KES)
-  const withdrawalFee = 50;
-  const netAmount = parseFloat(amount) - withdrawalFee;
+  // Calculate transaction fee (3%)
+  const withdrawalFee = amount ? parseFloat(amount) * 0.03 : 0;
+  const netAmount = amount ? parseFloat(amount) - withdrawalFee : 0;
+
+  const validateForm = () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      setError('Please enter a valid amount');
+      return false;
+    }
+
+    if (parseFloat(amount) > currentBalance) {
+      setError('Insufficient balance');
+      return false;
+    }
+
+    if (netAmount <= 0) {
+      setError('Amount is too small after withdrawal fee');
+      return false;
+    }
+
+    if (!paymentMethod) {
+      setError('Please select a payment method');
+      return false;
+    }
+
+    // Validate payment method specific details
+    switch (paymentMethod) {
+      case 'mpesa':
+      case 'airtel_money':
+        if (!paymentDetails.phone_number) {
+          setError('Please enter your phone number');
+          return false;
+        }
+        if (!/^(\+254|0)[17]\d{8}$/.test(paymentDetails.phone_number)) {
+          setError('Please enter a valid Kenyan phone number');
+          return false;
+        }
+        break;
+      case 'bank_transfer':
+        if (!paymentDetails.account_number || !paymentDetails.bank_code || !paymentDetails.account_name) {
+          setError('Please fill in all bank details');
+          return false;
+        }
+        break;
+      case 'paypal':
+        if (!paymentDetails.paypal_email) {
+          setError('Please enter your PayPal email');
+          return false;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paymentDetails.paypal_email)) {
+          setError('Please enter a valid email address');
+          return false;
+        }
+        break;
+    }
+
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    if (!amount || !bankDetails.account_number || !bankDetails.bank_code || !bankDetails.account_name) {
-      setError('Please fill in all fields');
-      setLoading(false);
-      return;
-    }
-
-    if (parseFloat(amount) > currentBalance) {
-      setError('Insufficient balance');
-      setLoading(false);
-      return;
-    }
-
-    if (netAmount <= 0) {
-      setError('Amount is too small after withdrawal fee');
+    if (!validateForm()) {
       setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch('/api/withdrawal/request', {
+      const response = await fetch('/api/withdrawals', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -95,16 +147,17 @@ export function WithdrawalForm({
         },
         body: JSON.stringify({
           amount: parseFloat(amount),
-          bank_details: bankDetails
+          payment_method: paymentMethod,
+          payment_details: paymentDetails
         })
       });
 
       const data = await response.json();
 
-      if (data.success) {
+      if (response.ok) {
         toast({
           title: "Withdrawal requested",
-          description: `KES ${netAmount.toFixed(2)} will be transferred to your account.`,
+          description: `KES ${netAmount.toFixed(2)} will be transferred via ${PAYMENT_METHODS.find(p => p.value === paymentMethod)?.label}.`,
         });
         onSuccess();
       } else {
@@ -118,12 +171,104 @@ export function WithdrawalForm({
     }
   };
 
+  const renderPaymentMethodFields = () => {
+    switch (paymentMethod) {
+      case 'mpesa':
+      case 'airtel_money':
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="phone_number">Phone Number</Label>
+            <Input
+              id="phone_number"
+              type="tel"
+              value={paymentDetails.phone_number || ''}
+              onChange={(e) => setPaymentDetails(prev => ({ ...prev, phone_number: e.target.value }))}
+              placeholder="e.g., +254712345678 or 0712345678"
+              required
+            />
+            <p className="text-xs text-gray-500">
+              Enter your {paymentMethod === 'mpesa' ? 'M-Pesa' : 'Airtel Money'} registered phone number
+            </p>
+          </div>
+        );
+
+      case 'bank_transfer':
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="bank">Select Bank</Label>
+              <Select
+                value={paymentDetails.bank_code || ''}
+                onValueChange={(value) => setPaymentDetails(prev => ({ ...prev, bank_code: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose your bank" />
+                </SelectTrigger>
+                <SelectContent>
+                  {KENYAN_BANKS.map((bank) => (
+                    <SelectItem key={bank.code} value={bank.code}>
+                      {bank.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="account_number">Account Number</Label>
+              <Input
+                id="account_number"
+                type="text"
+                value={paymentDetails.account_number || ''}
+                onChange={(e) => setPaymentDetails(prev => ({ ...prev, account_number: e.target.value }))}
+                placeholder="Enter account number"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="account_name">Account Name</Label>
+              <Input
+                id="account_name"
+                type="text"
+                value={paymentDetails.account_name || ''}
+                onChange={(e) => setPaymentDetails(prev => ({ ...prev, account_name: e.target.value }))}
+                placeholder="Enter account holder name"
+                required
+              />
+            </div>
+          </div>
+        );
+
+      case 'paypal':
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="paypal_email">PayPal Email</Label>
+            <Input
+              id="paypal_email"
+              type="email"
+              value={paymentDetails.paypal_email || ''}
+              onChange={(e) => setPaymentDetails(prev => ({ ...prev, paypal_email: e.target.value }))}
+              placeholder="your-email@example.com"
+              required
+            />
+            <p className="text-xs text-gray-500">
+              Enter the email address associated with your PayPal account
+            </p>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
         <CardTitle>Withdraw Funds</CardTitle>
         <CardDescription>
-          Transfer your earnings to your bank account
+          Transfer your earnings to your preferred payment method
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -155,7 +300,7 @@ export function WithdrawalForm({
                 <span>KES {parseFloat(amount).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm text-red-600">
-                <span>Withdrawal Fee:</span>
+                <span>Transaction Fee (3%):</span>
                 <span>- KES {withdrawalFee.toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-medium border-t pt-1">
@@ -166,47 +311,35 @@ export function WithdrawalForm({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="bank">Select Bank</Label>
+            <Label htmlFor="payment_method">Payment Method</Label>
             <Select
-              value={bankDetails.bank_code}
-              onValueChange={(value) => setBankDetails(prev => ({ ...prev, bank_code: value }))}
+              value={paymentMethod}
+              onValueChange={setPaymentMethod}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Choose your bank" />
+                <SelectValue placeholder="Choose payment method" />
               </SelectTrigger>
               <SelectContent>
-                {KENYAN_BANKS.map((bank) => (
-                  <SelectItem key={bank.code} value={bank.code}>
-                    {bank.name}
+                {PAYMENT_METHODS.map((method) => (
+                  <SelectItem key={method.value} value={method.value}>
+                    <div className="flex items-center space-x-2">
+                      <i className={method.icon}></i>
+                      <span>{method.label}</span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="account_number">Account Number</Label>
-            <Input
-              id="account_number"
-              type="text"
-              value={bankDetails.account_number}
-              onChange={(e) => setBankDetails(prev => ({ ...prev, account_number: e.target.value }))}
-              placeholder="Enter account number"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="account_name">Account Name</Label>
-            <Input
-              id="account_name"
-              type="text"
-              value={bankDetails.account_name}
-              onChange={(e) => setBankDetails(prev => ({ ...prev, account_name: e.target.value }))}
-              placeholder="Enter account holder name"
-              required
-            />
-          </div>
+          {paymentMethod && (
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <h4 className="font-medium mb-3">
+                {PAYMENT_METHODS.find(p => p.value === paymentMethod)?.label} Details
+              </h4>
+              {renderPaymentMethodFields()}
+            </div>
+          )}
 
           {error && (
             <Alert variant="destructive">
@@ -221,7 +354,7 @@ export function WithdrawalForm({
             </Button>
             <Button 
               type="submit"
-              disabled={loading || !amount || parseFloat(amount) <= 0}
+              disabled={loading || !amount || parseFloat(amount) <= 0 || !paymentMethod}
               className="flex-1"
             >
               {loading ? (
@@ -238,8 +371,10 @@ export function WithdrawalForm({
             </Button>
           </div>
 
-          <div className="text-xs text-muted-foreground text-center">
-            Withdrawal fee: KES 50 • Processing time: 1-3 business days
+          <div className="text-xs text-muted-foreground text-center space-y-1">
+            <p>Transaction fee: 3% of withdrawal amount</p>
+            <p>Processing time: 1-3 business days</p>
+            <p>Minimum withdrawal: KES 100</p>
           </div>
         </form>
       </CardContent>

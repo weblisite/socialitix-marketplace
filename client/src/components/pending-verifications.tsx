@@ -110,8 +110,8 @@ export function PendingVerifications() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Loading verifications...</span>
+        <Loader2 className="h-8 w-8 animate-spin text-lime-500" />
+        <span className="ml-2 text-white">Loading verifications...</span>
       </div>
     );
   }
@@ -122,7 +122,7 @@ export function PendingVerifications() {
         <Button
           variant="outline"
           onClick={() => setSelectedVerification(null)}
-          className="mb-4"
+          className="mb-4 border-gray-600 bg-gray-800 text-white hover:border-lime-500 hover:text-lime-500 hover:bg-gray-700"
         >
           ← Back to Verifications
         </Button>
@@ -138,8 +138,8 @@ export function PendingVerifications() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Pending Verifications</h2>
-          <p className="text-gray-600">
+          <h2 className="text-2xl font-bold text-white">Pending Verifications</h2>
+          <p className="text-gray-300">
             Review and verify proof submissions from providers
           </p>
         </div>
@@ -147,6 +147,7 @@ export function PendingVerifications() {
           onClick={handleRefresh}
           disabled={isRefreshing}
           variant="outline"
+          className="border-gray-600 bg-gray-800 text-white hover:border-lime-500 hover:text-lime-500 hover:bg-gray-700"
         >
           {isRefreshing ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -158,11 +159,11 @@ export function PendingVerifications() {
       </div>
 
       {verifications.length === 0 ? (
-        <Card>
+        <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-            <h3 className="text-lg font-medium mb-2">No Pending Verifications</h3>
-            <p className="text-gray-600 text-center">
+            <h3 className="text-lg font-medium text-white mb-2">No Pending Verifications</h3>
+            <p className="text-gray-300 text-center">
               All proof submissions have been reviewed or are being processed by our AI system.
             </p>
           </CardContent>
@@ -170,7 +171,7 @@ export function PendingVerifications() {
       ) : (
         <div className="space-y-4">
           {/* Summary Alert */}
-          <Alert>
+          <Alert className="bg-yellow-500/10 border-yellow-500/20 text-yellow-400">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
               <strong>Verification Reminder:</strong> You have {verifications.length} pending verification(s). 
@@ -180,7 +181,7 @@ export function PendingVerifications() {
 
           {/* Verifications List */}
           {verifications.map((verification) => (
-            <Card key={verification.id} className="hover:shadow-md transition-shadow">
+            <Card key={verification.id} className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 hover:border-lime-500/30 transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -190,7 +191,7 @@ export function PendingVerifications() {
                         <h3 className="font-medium">
                           {verification.action_type} on {verification.platform}
                         </h3>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-300">
                           Provider: {verification.provider_name}
                         </p>
                       </div>
@@ -199,21 +200,21 @@ export function PendingVerifications() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-300">
                           <strong>Target:</strong> {verification.target_url}
                         </p>
                         {verification.comment_text && (
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-gray-300">
                             <strong>Comment:</strong> {verification.comment_text}
                           </p>
                         )}
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-300">
                           <strong>Submitted:</strong> {new Date(verification.submitted_at).toLocaleString()}
                         </p>
                         {verification.time_remaining !== null && (
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-gray-300">
                             <strong>Time Remaining:</strong> {formatTimeRemaining(verification.time_remaining)}
                           </p>
                         )}
@@ -222,8 +223,8 @@ export function PendingVerifications() {
 
                     {/* Proof Preview */}
                     <div className="mb-4">
-                      <p className="text-sm font-medium mb-2">Proof Screenshot:</p>
-                      <div className="border rounded-lg overflow-hidden bg-gray-100 w-32 h-24">
+                      <p className="text-sm font-medium mb-2 text-white">Proof Screenshot:</p>
+                      <div className="border border-gray-600 rounded-lg overflow-hidden bg-gray-700 w-32 h-24">
                         <img
                           src={verification.proof_url}
                           alt="Proof preview"
@@ -246,7 +247,7 @@ export function PendingVerifications() {
                     <Button
                       onClick={() => setSelectedVerification(verification)}
                       disabled={!verification.time_remaining || verification.time_remaining <= 0}
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700 text-white font-semibold py-2 rounded-xl shadow-lg hover:shadow-lime-500/25 transition-all duration-300"
                     >
                       <Eye className="h-4 w-4" />
                       {verification.time_remaining && verification.time_remaining > 0 
@@ -259,7 +260,7 @@ export function PendingVerifications() {
 
                 {/* Expired Notice */}
                 {verification.time_remaining !== null && verification.time_remaining <= 0 && (
-                  <Alert className="mt-4 bg-blue-50 border-blue-200">
+                  <Alert className="mt-4 bg-blue-500/10 border-blue-500/20 text-blue-400">
                     <Clock className="h-4 w-4" />
                     <AlertDescription>
                       The manual verification window has expired. Our AI system will automatically analyze this proof 

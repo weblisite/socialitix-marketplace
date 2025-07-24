@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth.tsx";
 import { useLocation } from "wouter";
+import { WithdrawalManagement } from "@/components/withdrawal-management";
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -40,7 +41,7 @@ export default function AdminDashboard() {
               </h1>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-white">Welcome, {user?.name}</span>
+              <span className="text-gray-400">Welcome, {user?.name}</span>
               <Button
                 variant="outline"
                 onClick={logout}
@@ -63,12 +64,12 @@ export default function AdminDashboard() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-black/80 border-gray-800 hover:border-lime-500/30 transition-all duration-300">
+          <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 hover:border-lime-500/30 transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-300 font-medium text-sm">Total Users</p>
-                  <p className="text-3xl font-bold text-white">{stats.totalUsers || 0}</p>
+                  <p className="text-gray-300 text-sm">Total Users</p>
+                  <p className="text-2xl font-bold text-white">{stats.totalUsers || 0}</p>
                 </div>
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                   <i className="fas fa-users text-white text-xl"></i>
@@ -77,12 +78,12 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="bg-black/80 border-gray-800 hover:border-lime-500/30 transition-all duration-300">
+          <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 hover:border-lime-500/30 transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-300 font-medium text-sm">Total Transactions</p>
-                  <p className="text-3xl font-bold text-white">{stats.totalTransactions || 0}</p>
+                  <p className="text-gray-300 text-sm">Total Transactions</p>
+                  <p className="text-2xl font-bold text-white">{stats.totalTransactions || 0}</p>
                 </div>
                 <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
                   <i className="fas fa-exchange-alt text-white text-xl"></i>
@@ -91,12 +92,12 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="bg-black/80 border-gray-800 hover:border-lime-500/30 transition-all duration-300">
+          <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 hover:border-lime-500/30 transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-300 font-medium text-sm">Platform Revenue</p>
-                  <p className="text-3xl font-bold text-lime-500">{stats.platformRevenue || 0} KES</p>
+                  <p className="text-gray-300 text-sm">Platform Revenue</p>
+                  <p className="text-2xl font-bold text-lime-500">{stats.platformRevenue || 0} KES</p>
                 </div>
                 <div className="w-12 h-12 bg-gradient-to-br from-lime-500 to-lime-600 rounded-xl flex items-center justify-center">
                   <i className="fas fa-coins text-white text-xl"></i>
@@ -105,12 +106,12 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="bg-black/80 border-gray-800 hover:border-lime-500/30 transition-all duration-300">
+          <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 hover:border-lime-500/30 transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-300 font-medium text-sm">Active Assignments</p>
-                  <p className="text-3xl font-bold text-yellow-500">{stats.activeAssignments || 0}</p>
+                  <p className="text-gray-300 text-sm">Active Assignments</p>
+                  <p className="text-2xl font-bold text-yellow-500">{stats.activeAssignments || 0}</p>
                 </div>
                 <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center">
                   <i className="fas fa-tasks text-white text-xl"></i>
@@ -121,20 +122,20 @@ export default function AdminDashboard() {
         </div>
 
         {/* Revenue Trends */}
-        <Card className="bg-black/80 border-gray-800 mb-8">
+        <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 mb-8">
           <CardContent className="p-6">
             <h3 className="text-xl font-semibold text-white mb-4">Revenue Trends</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center p-4 bg-gray-900/80 rounded-xl border border-gray-700">
-                <p className="text-gray-400 text-sm">Today</p>
+              <div className="text-center p-4 bg-gray-700/50 rounded-xl border border-gray-600">
+                <p className="text-gray-300 text-sm">Today</p>
                 <p className="text-2xl font-bold text-lime-500">{stats.todayRevenue || 0} KES</p>
               </div>
-              <div className="text-center p-4 bg-gray-900/80 rounded-xl border border-gray-700">
-                <p className="text-gray-400 text-sm">This Week</p>
+              <div className="text-center p-4 bg-gray-700/50 rounded-xl border border-gray-600">
+                <p className="text-gray-300 text-sm">This Week</p>
                 <p className="text-2xl font-bold text-blue-500">{stats.weekRevenue || 0} KES</p>
               </div>
-              <div className="text-center p-4 bg-gray-900/80 rounded-xl border border-gray-700">
-                <p className="text-gray-400 text-sm">This Month</p>
+              <div className="text-center p-4 bg-gray-700/50 rounded-xl border border-gray-600">
+                <p className="text-gray-300 text-sm">This Month</p>
                 <p className="text-2xl font-bold text-green-500">{stats.monthRevenue || 0} KES</p>
               </div>
             </div>
@@ -143,11 +144,11 @@ export default function AdminDashboard() {
 
         {/* User Distribution */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800">
+          <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700">
             <CardContent className="p-6">
               <h3 className="text-xl font-semibold text-white mb-4">User Distribution</h3>
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg border border-gray-600">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                       <i className="fas fa-shopping-cart text-white text-sm"></i>
@@ -156,7 +157,7 @@ export default function AdminDashboard() {
                   </div>
                   <span className="text-lime-500 font-bold">{stats.buyers || 0}</span>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg border border-gray-600">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
                       <i className="fas fa-user-cog text-white text-sm"></i>
@@ -165,7 +166,7 @@ export default function AdminDashboard() {
                   </div>
                   <span className="text-lime-500 font-bold">{stats.providers || 0}</span>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg border border-gray-600">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
                       <i className="fas fa-shield-alt text-white text-sm"></i>
@@ -178,11 +179,11 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800">
+          <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700">
             <CardContent className="p-6">
               <h3 className="text-xl font-semibold text-white mb-4">Platform Statistics</h3>
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg border border-gray-600">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
                       <i className="fas fa-clock text-white text-sm"></i>
@@ -191,7 +192,7 @@ export default function AdminDashboard() {
                   </div>
                   <span className="text-yellow-500 font-bold">{stats.pendingVerifications || 0}</span>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg border border-gray-600">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
                       <i className="fas fa-check-circle text-white text-sm"></i>
@@ -200,7 +201,7 @@ export default function AdminDashboard() {
                   </div>
                   <span className="text-green-500 font-bold">{stats.completedTasks || 0}</span>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg border border-gray-600">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center">
                       <i className="fas fa-exclamation-triangle text-white text-sm"></i>
@@ -214,35 +215,72 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border-gray-800 mt-8">
-          <CardContent className="p-6">
-            <h3 className="text-xl font-semibold text-white mb-4">Quick Actions</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button
-                variant="outline"
-                className="border-gray-700 text-gray-300 hover:border-lime-500 hover:text-lime-500 h-12"
-              >
-                <i className="fas fa-users mr-2"></i>
-                Manage Users
-              </Button>
-              <Button
-                variant="outline"
-                className="border-gray-700 text-gray-300 hover:border-lime-500 hover:text-lime-500 h-12"
-              >
-                <i className="fas fa-tasks mr-2"></i>
-                Review Assignments
-              </Button>
-              <Button
-                variant="outline"
-                className="border-gray-700 text-gray-300 hover:border-lime-500 hover:text-lime-500 h-12"
-              >
-                <i className="fas fa-chart-bar mr-2"></i>
-                View Analytics
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Tab Navigation */}
+        <div className="flex space-x-1 bg-gray-700/50 p-1 rounded-lg mb-8">
+          <Button
+            variant={activeTab === "overview" ? "default" : "ghost"}
+            onClick={() => setActiveTab("overview")}
+            className={`flex-1 ${
+              activeTab === "overview"
+                ? "bg-lime-500 text-white"
+                : "text-gray-300 hover:text-white"
+            }`}
+          >
+            <i className="fas fa-chart-line mr-2"></i>
+            Overview
+          </Button>
+          <Button
+            variant={activeTab === "withdrawals" ? "default" : "ghost"}
+            onClick={() => setActiveTab("withdrawals")}
+            className={`flex-1 ${
+              activeTab === "withdrawals"
+                ? "bg-lime-500 text-white"
+                : "text-gray-300 hover:text-white"
+            }`}
+          >
+            <i className="fas fa-money-bill-wave mr-2"></i>
+            Withdrawals
+          </Button>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === "overview" && (
+          <>
+            {/* Quick Actions */}
+            <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 mt-8">
+              <CardContent className="p-6">
+                <h3 className="text-xl font-semibold text-white mb-4">Quick Actions</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button
+                    variant="outline"
+                    className="border-gray-600 text-gray-300 hover:border-lime-500 hover:text-lime-500 h-12"
+                  >
+                    <i className="fas fa-users mr-2"></i>
+                    Manage Users
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-gray-600 text-gray-300 hover:border-lime-500 hover:text-lime-500 h-12"
+                  >
+                    <i className="fas fa-tasks mr-2"></i>
+                    Review Assignments
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-gray-600 text-gray-300 hover:border-lime-500 hover:text-lime-500 h-12"
+                  >
+                    <i className="fas fa-chart-bar mr-2"></i>
+                    View Analytics
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {activeTab === "withdrawals" && (
+          <WithdrawalManagement />
+        )}
       </div>
     </div>
   );

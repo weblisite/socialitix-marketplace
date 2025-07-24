@@ -6,6 +6,7 @@ interface User {
   id: number;
   email: string;
   name: string;
+  full_name?: string;
   role: 'buyer' | 'provider' | 'admin';
   balance: string;
   socialMediaAccounts: any;
@@ -48,15 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (response.ok) {
           const userData = await response.json();
-          // Map the database user object to our User interface
-          return {
-            id: userData.id,
-            email: userData.email,
-            name: userData.full_name || userData.name || '', // Map full_name to name
-            role: userData.role,
-            balance: userData.balance || '0.00',
-            socialMediaAccounts: userData.socialMediaAccounts || {},
-          } as User;
+          return userData as User;
         } else if (response.status === 404) {
           // Profile doesn't exist, try to create it
           try {
@@ -75,15 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             
             if (createResponse.ok) {
               const newUserData = await createResponse.json();
-              // Map the created user object to our User interface
-              return {
-                id: newUserData.user.id,
-                email: newUserData.user.email,
-                name: newUserData.user.full_name || newUserData.user.name || '', // Map full_name to name
-                role: newUserData.user.role,
-                balance: newUserData.user.balance || '0.00',
-                socialMediaAccounts: newUserData.user.socialMediaAccounts || {},
-              } as User;
+              return newUserData.user as User;
             }
           } catch (createError) {
             console.warn('Failed to create user profile:', createError);
@@ -209,6 +194,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     localStorage.removeItem('token');
     queryClient.clear();
+    // Redirect to landing page after logout
+    window.location.href = '/';
   };
 
   // Supabase handles auth headers automatically

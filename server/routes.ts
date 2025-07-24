@@ -11,7 +11,7 @@ import { sendEmail, initializeEmailTemplates } from './email';
 import { moderateContent, validateCommentText, approveContent, rejectContent } from './moderation';
 import { linkSocialMediaAccount, getUserSocialAccounts } from './social-media';
 import { getProviderAssignments, startAssignment, submitAssignmentProof } from './action-assignments';
-import { upload, processProofImage, validateProofImage } from './file-upload';
+import { upload } from './file-upload';
 import { createUserProfileInSupabase, getUserProfileFromSupabase, supabase } from './supabase';
 import { 
   submitProof, 
@@ -333,6 +333,191 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Provider service selection
+  app.get("/api/provider/services", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'provider') {
+        return res.status(403).json({ message: "Only providers can view their services" });
+      }
+
+      // Get provider's selected service IDs
+      const { data: providerServices, error } = await supabase
+        .from('provider_services')
+        .select('service_id, status')
+        .eq('provider_id', req.user.id)
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      
+      // Get the selected service IDs
+      const selectedServiceIds = providerServices.map(item => item.service_id);
+      
+      // Get full service details for the selected services
+      const allServices = [
+        {
+          id: "instagram-followers",
+          platform: "instagram",
+          action_type: "followers",
+          name: "Instagram Followers",
+          description: "Follow the specified Instagram account using your personal account",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 95
+        },
+        {
+          id: "instagram-likes",
+          platform: "instagram",
+          action_type: "likes",
+          name: "Instagram Likes",
+          description: "Like the specified Instagram post using your personal account",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 98
+        },
+        {
+          id: "instagram-comments",
+          platform: "instagram",
+          action_type: "comments",
+          name: "Instagram Comments",
+          description: "Write and post a comment on the specified Instagram post",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 92
+        },
+        {
+          id: "youtube-subscribers",
+          platform: "youtube",
+          action_type: "subscribers",
+          name: "YouTube Subscribers",
+          description: "Subscribe to the specified YouTube channel using your personal account",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 90
+        },
+        {
+          id: "youtube-likes",
+          platform: "youtube",
+          action_type: "likes",
+          name: "YouTube Likes",
+          description: "Like the specified YouTube video using your personal account",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 95
+        },
+        {
+          id: "youtube-views",
+          platform: "youtube",
+          action_type: "views",
+          name: "YouTube Views",
+          description: "Watch the specified YouTube video completely (minimum 30 seconds)",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 88
+        },
+        {
+          id: "twitter-followers",
+          platform: "twitter",
+          action_type: "followers",
+          name: "Twitter Followers",
+          description: "Follow the specified X / Twitter account using your personal account",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 93
+        },
+        {
+          id: "twitter-likes",
+          platform: "twitter",
+          action_type: "likes",
+          name: "Twitter Likes",
+          description: "Like the specified X / Twitter tweet using your personal account",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 96
+        },
+        {
+          id: "twitter-retweets",
+          platform: "twitter",
+          action_type: "retweets",
+          name: "Twitter Retweets",
+          description: "Retweet the specified X / Twitter post using your personal account",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 89
+        },
+        {
+          id: "tiktok-followers",
+          platform: "tiktok",
+          action_type: "followers",
+          name: "TikTok Followers",
+          description: "Follow the specified TikTok account using your personal account",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 91
+        },
+        {
+          id: "tiktok-likes",
+          platform: "tiktok",
+          action_type: "likes",
+          name: "TikTok Likes",
+          description: "Like the specified TikTok video using your personal account",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 94
+        },
+        {
+          id: "tiktok-views",
+          platform: "tiktok",
+          action_type: "views",
+          name: "TikTok Views",
+          description: "Watch the specified TikTok video completely",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 87
+        },
+        {
+          id: "facebook-followers",
+          platform: "facebook",
+          action_type: "followers",
+          name: "Facebook Followers",
+          description: "Follow the specified Facebook page using your personal account",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 92
+        },
+        {
+          id: "facebook-likes",
+          platform: "facebook",
+          action_type: "likes",
+          name: "Facebook Likes",
+          description: "Like the specified Facebook post using your personal account",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 95
+        },
+        {
+          id: "facebook-shares",
+          platform: "facebook",
+          action_type: "shares",
+          name: "Facebook Shares",
+          description: "Share the specified Facebook post using your personal account",
+          buyerPrice: 10,
+          providerEarnings: 5,
+          success_rate: 88
+        }
+      ];
+      
+      // Filter services to only include the ones the provider has selected
+      const selectedServices = allServices.filter(service => 
+        selectedServiceIds.includes(service.id)
+      );
+      
+      // Return the selected services with full details
+      res.json(selectedServices);
+    } catch (error) {
+      console.error('Error getting provider services:', error);
+      res.status(500).json({ message: "Failed to get provider services", error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   app.post("/api/provider/services", authenticateToken, async (req: any, res) => {
     try {
       if (req.user.role !== 'provider') {
@@ -341,52 +526,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { serviceIds } = req.body;
       
+      // Validate serviceIds
+      if (!serviceIds || !Array.isArray(serviceIds)) {
+        return res.status(400).json({ message: "Invalid serviceIds format" });
+      }
+      
+      // Check for null/undefined values
+      const invalidIds = serviceIds.filter(id => !id || id === null || id === undefined);
+      if (invalidIds.length > 0) {
+        return res.status(400).json({ message: "Invalid service IDs found", invalidIds });
+      }
+      
       // Clear existing service selections
-      await supabase
+      let { error: deleteError } = await supabase
         .from('provider_services')
         .delete()
         .eq('provider_id', req.user.id);
       
-      // Add new service selections
+      // If table doesn't exist, create it
+      if (deleteError && deleteError.code === '42P01') {
+        console.log('Creating provider_services table...');
+        const { error: createError } = await supabase.rpc('exec_sql', {
+          sql: `
+            CREATE TABLE provider_services (
+              id SERIAL PRIMARY KEY,
+              provider_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              service_id VARCHAR(50) NOT NULL,
+              status VARCHAR(20) DEFAULT 'active',
+              created_at TIMESTAMP DEFAULT NOW(),
+              updated_at TIMESTAMP DEFAULT NOW()
+            );
+            
+            CREATE INDEX idx_provider_services_provider_id ON provider_services(provider_id);
+            CREATE INDEX idx_provider_services_service_id ON provider_services(service_id);
+            CREATE INDEX idx_provider_services_status ON provider_services(status);
+          `
+        });
+        
+        if (createError) {
+          console.error('Error creating provider_services table:', createError);
+          return res.status(500).json({ message: "Failed to create services table" });
+        }
+        
+        // Try delete again (should be empty now)
+        const { error: retryDeleteError } = await supabase
+          .from('provider_services')
+          .delete()
+          .eq('provider_id', req.user.id);
+        
+        deleteError = retryDeleteError;
+      }
+      
+      if (deleteError) {
+        console.error('Error deleting existing services:', deleteError);
+        return res.status(500).json({ message: "Failed to update services" });
+      }
+      
+      // Insert new service selections
       if (serviceIds && serviceIds.length > 0) {
-        const serviceSelections = serviceIds.map((serviceId: string) => ({
+        const serviceRecords = serviceIds.map((serviceId: string) => ({
           provider_id: req.user.id,
           service_id: serviceId,
           status: 'active'
         }));
         
-        const { error } = await supabase
+        const { error: insertError } = await supabase
           .from('provider_services')
-          .insert(serviceSelections);
+          .insert(serviceRecords);
         
-        if (error) throw error;
+        if (insertError) {
+          console.error('Error inserting services:', insertError);
+          return res.status(500).json({ message: "Failed to update services" });
+        }
       }
       
-      res.json({ message: 'Services updated successfully' });
+      res.json({ message: "Provider services updated successfully" });
     } catch (error) {
-      res.status(500).json({ message: "Failed to update provider services", error });
-    }
-  });
-
-  app.get("/api/services/provider", authenticateToken, async (req: any, res) => {
-    try {
-      if (req.user.role !== 'provider') {
-        return res.status(403).json({ message: "Only providers can view their services" });
-      }
-
-      // Get provider's selected services
-      const { data, error } = await supabase
-        .from('provider_services')
-        .select('service_id')
-        .eq('provider_id', req.user.id)
-        .eq('status', 'active');
-      
-      if (error) throw error;
-      
-      const selectedServiceIds = data.map(item => item.service_id);
-      res.json(selectedServiceIds);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to get provider services", error });
+      console.error('Error updating provider services:', error);
+      res.status(500).json({ message: "Failed to update services", error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -579,16 +796,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const transaction = await storage.createTransaction(transactionData);
       
-      // Create action assignments for each action needed
-      // Each provider will handle 1 action
-      await storage.assignActionsToProviders(
-        transaction.id,
-        transactionData.quantity,
-        req.body.platform || 'instagram',
-        req.body.actionType || 'followers',
-        req.body.targetUrl || '',
-        req.body.commentText
-      );
+      // Create available assignments for providers
+      try {
+        const { createAvailableAssignments } = await import('./available-assignments');
+        await createAvailableAssignments(transaction.id);
+      } catch (assignmentError) {
+        console.error('Error creating available assignments:', assignmentError);
+        // Don't fail the transaction if assignment creation fails
+      }
       
       // Update transaction status to in_progress
       await storage.updateTransaction(transaction.id, { status: 'in_progress' });
@@ -609,11 +824,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only providers and admins can view withdrawals" });
       }
 
-      const providerId = req.user.role === 'provider' ? req.user.id : undefined;
-      const withdrawals = await storage.getWithdrawals(providerId);
-      res.json(withdrawals);
+      let query = supabase
+        .from('withdrawals')
+        .select(`
+          *,
+          users!withdrawals_provider_id_fkey(
+            id,
+            email,
+            full_name,
+            username
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      // If provider, only show their withdrawals
+      if (req.user.role === 'provider') {
+        query = query.eq('provider_id', req.user.id);
+      }
+
+      const { data: withdrawals, error } = await query;
+
+      if (error) {
+        console.error('Error fetching withdrawals:', error);
+        return res.status(500).json({ message: "Failed to get withdrawals" });
+      }
+
+      res.json(withdrawals || []);
     } catch (error) {
-      res.status(500).json({ message: "Failed to get withdrawals", error });
+      console.error('Withdrawals error:', error);
+      res.status(500).json({ message: "Failed to get withdrawals", error: (error as Error).message });
     }
   });
 
@@ -623,28 +862,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only providers can request withdrawals" });
       }
 
-      const { amount } = req.body;
+      const { amount, payment_method, payment_details } = req.body;
       
-      // Calculate fee: 2.9% + 30 shillings
-      const fee = (parseFloat(amount) * 0.029) + 30;
-      const netAmount = parseFloat(amount) - fee;
+                              // Validate minimum withdrawal amount
+            if (parseFloat(amount) < 100) {
+              return res.status(400).json({ message: "Minimum withdrawal amount is KES 100" });
+            }
+
+            // Calculate fee: 3% transaction fee
+            const fee = parseFloat(amount) * 0.03;
+            const netAmount = parseFloat(amount) - fee;
 
       if (netAmount <= 0) {
         return res.status(400).json({ message: "Amount too small after fees" });
       }
 
+      // Check if user has sufficient balance
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('balance')
+        .eq('id', req.user.id)
+        .single();
+
+      if (userError || parseFloat(user?.balance || '0') < parseFloat(amount)) {
+        return res.status(400).json({ message: "Insufficient balance" });
+      }
+
       const withdrawalData = insertWithdrawalSchema.parse({
-        providerId: req.user.id,
+        provider_id: req.user.id,
         amount: amount.toString(),
         fee: fee.toString(),
-        netAmount: netAmount.toString(),
-        status: "pending"
+        net_amount: netAmount.toString(),
+        status: "pending",
+        payment_method,
+        payment_details
       });
 
-      const withdrawal = await storage.createWithdrawal(withdrawalData);
-      res.json(withdrawal);
+      // Create withdrawal record
+      const { data: withdrawal, error: withdrawalError } = await supabase
+        .from('withdrawals')
+        .insert([withdrawalData])
+        .select()
+        .single();
+
+      if (withdrawalError) {
+        console.error('Error creating withdrawal:', withdrawalError);
+        return res.status(500).json({ message: "Failed to create withdrawal request" });
+      }
+
+      // Deduct amount from user balance
+      const newBalance = parseFloat(user?.balance || '0') - parseFloat(amount);
+      const { error: balanceError } = await supabase
+        .from('users')
+        .update({ balance: newBalance.toFixed(2) })
+        .eq('id', req.user.id);
+
+      if (balanceError) {
+        console.error('Error updating balance:', balanceError);
+        return res.status(500).json({ message: "Failed to update balance" });
+      }
+
+      res.json({
+        success: true,
+        withdrawal,
+        new_balance: newBalance.toFixed(2)
+      });
     } catch (error) {
-      res.status(400).json({ message: "Invalid withdrawal data", error });
+      console.error('Withdrawal error:', error);
+      res.status(400).json({ message: "Invalid withdrawal data", error: (error as Error).message });
+    }
+  });
+
+  // Admin withdrawal management routes
+  app.put("/api/admin/withdrawals/:id/status", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { id } = req.params;
+      const { status, admin_notes, external_payment_id } = req.body;
+
+      const validStatuses = ['pending', 'processing', 'completed', 'failed', 'cancelled'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      const updateData: any = {
+        status,
+        processed_by: req.user.id,
+        processed_at: new Date().toISOString()
+      };
+
+      if (admin_notes) updateData.admin_notes = admin_notes;
+      if (external_payment_id) updateData.external_payment_id = external_payment_id;
+
+      const { data: withdrawal, error } = await supabase
+        .from('withdrawals')
+        .update(updateData)
+        .eq('id', id)
+        .select(`
+          *,
+          users!withdrawals_provider_id_fkey(
+            id,
+            email,
+            full_name,
+            username
+          )
+        `)
+        .single();
+
+      if (error) {
+        console.error('Error updating withdrawal:', error);
+        return res.status(500).json({ message: "Failed to update withdrawal" });
+      }
+
+      res.json({ success: true, withdrawal });
+    } catch (error) {
+      console.error('Update withdrawal error:', error);
+      res.status(500).json({ message: "Failed to update withdrawal", error: (error as Error).message });
     }
   });
 
@@ -684,6 +1020,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const transaction = await storage.createTransaction(transactionData);
+      
+      // Create available assignments for providers
+      try {
+        const { createAvailableAssignments } = await import('./available-assignments');
+        await createAvailableAssignments(transaction.id);
+      } catch (assignmentError) {
+        console.error('Error creating available assignments:', assignmentError);
+        // Don't fail the transaction if assignment creation fails
+      }
       
       res.json({
         reference: `TXN_${transaction.id}_${Date.now()}`,
@@ -790,25 +1135,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/assignments/:id/submit-proof", authenticateToken, upload.single('proof'), async (req: any, res) => {
+  app.post("/api/assignments/:id/submit-proof", authenticateToken, async (req: any, res) => {
     try {
       const assignmentId = parseInt(req.params.id);
-      let proofUrl = '';
+      const { screenshot_url, submission_notes } = req.body;
 
-      if (req.file) {
-        const validation = validateProofImage(req.file);
-        if (!validation.valid) {
-          return res.status(400).json({ message: "Invalid image", errors: validation.errors });
-        }
-
-        const processResult = await processProofImage(req.file.buffer, req.file.originalname, req.user.id, assignmentId);
-        if (!processResult.success) {
-          return res.status(500).json({ message: "Failed to process image", error: processResult.error });
-        }
-        proofUrl = processResult.url!;
+      if (!screenshot_url) {
+        return res.status(400).json({ message: "Screenshot URL is required" });
       }
 
-      const result = await submitAssignmentProof(assignmentId, req.user.id, proofUrl);
+      const result = await submitAssignmentProof(assignmentId, req.user.id, screenshot_url);
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to submit proof", error: (error as Error).message });
@@ -1034,29 +1370,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Assignment is not in progress" });
       }
 
-      // Validate and process the proof image
-      const validationResult = await validateProofImage(proofImage);
-      if (!validationResult.valid) {
-        return res.status(400).json({ message: validationResult.errors.join(', ') });
-      }
-
-      // Process and upload the image
-      const uploadResult = await processProofImage(
-        proofImage.buffer,
-        proofImage.originalname,
-        req.user.id,
-        parseInt(assignment_id)
-      );
-      if (!uploadResult.success) {
-        return res.status(500).json({ message: "Failed to upload proof image" });
-      }
-
       // Submit proof for verification
       const verificationResult = await submitProof(
         parseInt(assignment_id),
         req.user.id,
         proofImage.buffer,
-        uploadResult.url || ''
+        '' // URL will be set by the verification system
       );
 
       if (!verificationResult.success) {
@@ -1112,6 +1431,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       res.status(500).json({ message: "Failed to verify proof", error: (error as Error).message });
+    }
+  });
+
+  // ===== AVAILABLE ASSIGNMENTS SYSTEM =====
+
+  // Get available assignments for providers (filtered by their selected services)
+  app.get("/api/provider/available-assignments", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'provider') {
+        return res.status(403).json({ message: "Provider access required" });
+      }
+
+      // Get provider's selected services
+      const { data: providerServices, error: servicesError } = await supabase
+        .from('provider_services')
+        .select('service_id')
+        .eq('provider_id', req.user.id)
+        .eq('status', 'active');
+
+      if (servicesError) throw servicesError;
+
+      if (!providerServices || providerServices.length === 0) {
+        return res.json([]);
+      }
+
+      const serviceIds = providerServices.map(ps => ps.service_id);
+
+      // Get available assignments for the provider's services
+      const { data: availableAssignments, error: assignmentsError } = await supabase
+        .from('available_assignments')
+        .select(`
+          *,
+          transactions!inner(
+            id,
+            service_id,
+            quantity,
+            target_url,
+            comment_text,
+            buyer_id,
+            status
+          ),
+          services!inner(
+            id,
+            name,
+            platform,
+            action_type
+          )
+        `)
+        .eq('status', 'available')
+        .in('service_id', serviceIds)
+        .order('created_at', { ascending: false });
+
+      if (assignmentsError) throw assignmentsError;
+
+      res.json(availableAssignments || []);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch available assignments", error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Claim an available assignment
+  app.post("/api/provider/claim-assignment/:assignmentId", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'provider') {
+        return res.status(403).json({ message: "Provider access required" });
+      }
+
+      const assignmentId = parseInt(req.params.assignmentId);
+
+      // Check if assignment is still available
+      const { data: assignment, error: assignmentError } = await supabase
+        .from('available_assignments')
+        .select('*')
+        .eq('id', assignmentId)
+        .eq('status', 'available')
+        .single();
+
+      if (assignmentError || !assignment) {
+        return res.status(404).json({ message: "Assignment not available or not found" });
+      }
+
+      // Update assignment status to claimed
+      const { error: updateError } = await supabase
+        .from('available_assignments')
+        .update({ 
+          status: 'claimed',
+          claimed_by: req.user.id,
+          claimed_at: new Date().toISOString()
+        })
+        .eq('id', assignmentId);
+
+      if (updateError) throw updateError;
+
+      // Create action assignment for the provider
+      const { error: actionError } = await supabase
+        .from('action_assignments')
+        .insert({
+          transaction_id: assignment.transaction_id,
+          provider_id: req.user.id,
+          platform: assignment.platform,
+          action_type: assignment.action_type,
+          target_url: assignment.target_url,
+          comment_text: assignment.comment_text,
+          status: 'assigned',
+          assigned_at: new Date().toISOString(),
+          provider_earnings: assignment.provider_earnings
+        });
+
+      if (actionError) throw actionError;
+
+      res.json({ message: "Assignment claimed successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to claim assignment", error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Upload proof screenshot
+  app.post("/api/upload-proof", authenticateToken, upload.single('file'), async (req: any, res) => {
+    try {
+      const { uploadProofScreenshot } = await import('./file-upload');
+      await uploadProofScreenshot(req, res);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upload file", error });
     }
   });
 
@@ -1328,13 +1770,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const transactionIds = transactions.map(t => t.id);
 
-      // Then get action assignments for these transactions
+      // Then get available assignments for these transactions
       const { data: assignments, error } = await supabase
-        .from('action_assignments')
-        .select(`
-          *,
-          users!action_assignments_provider_id_fkey(name, email)
-        `)
+        .from('available_assignments')
+        .select('*')
         .in('transaction_id', transactionIds)
         .order('created_at', { ascending: false });
 
@@ -1351,20 +1790,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: assignment.status,
         targetUrl: assignment.target_url,
         commentText: assignment.comment_text,
-        proofUrl: assignment.proof_url,
+        proofUrl: null, // available_assignments don't have proof_url
         createdAt: assignment.created_at,
-        assignedAt: assignment.assigned_at,
-        completedAt: assignment.completed_at,
-        providerId: assignment.provider_id,
-        providerName: assignment.users?.name,
-        providerEmail: assignment.users?.email,
-        verificationScreenshots: assignment.proof_url ? [
-          {
-            url: assignment.proof_url,
-            description: 'Verification screenshot',
-            uploadedAt: assignment.submitted_at
-          }
-        ] : []
+        assignedAt: assignment.claimed_at || assignment.created_at, // Use claimed_at if available, otherwise created_at
+        completedAt: assignment.claimed_at, // Use claimed_at as completion time
+        providerId: assignment.claimed_by || null, // Use claimed_by as provider_id, null if not claimed
+        providerName: assignment.claimed_by ? 'Provider' : null, // Placeholder since we don't have user info
+        providerEmail: assignment.claimed_by ? 'provider@example.com' : null, // Placeholder
+        verificationScreenshots: [] // available_assignments don't have verification screenshots yet
       })) || [];
 
       res.json(buyerAssignments);
@@ -1463,8 +1896,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Validate minimum quantity
       const quantityNum = parseInt(quantity);
-      if (quantityNum < 20) {
-        return res.status(400).json({ message: "Minimum quantity required is 20" });
+      if (quantityNum < 1) {
+        return res.status(400).json({ message: "Minimum quantity required is 1" });
       }
 
       // Create payment request
@@ -1490,15 +1923,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Log the payment transaction
-      await logPaymentTransaction(
-        req.user.id,
-        parseFloat(amount),
-        paymentResponse.payment_id!,
-        'pending',
-        paymentResponse.payment_id!,
-        service_id,
-        parseInt(quantity)
-      );
+      try {
+        await logPaymentTransaction(
+          req.user.id,
+          parseFloat(amount),
+          paymentResponse.payment_id!,
+          'pending',
+          paymentResponse.payment_id!,
+          service_id,
+          parseInt(quantity),
+          target_url,
+          comment_text
+        );
+        console.log('Payment transaction logged successfully');
+      } catch (transactionError) {
+        console.error('Error logging payment transaction:', transactionError);
+        return res.status(500).json({ 
+          message: "Failed to create transaction record", 
+          error: (transactionError as Error).message 
+        });
+      }
 
       res.json({
         success: true,
@@ -1507,6 +1951,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
     } catch (error) {
+      console.error('Payment creation error:', error);
       res.status(500).json({ message: "Failed to create payment", error: (error as Error).message });
     }
   });
@@ -1539,17 +1984,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/payment/callback", async (req: any, res) => {
     try {
+      console.log('Payment callback received:', req.body);
       const { payment_id, state, reference } = req.body;
 
       if (state === 'COMPLETED') {
+        console.log('Payment completed, updating transaction...');
         // Update transaction status to completed (payment received)
-        const { error } = await supabase
+        const { data: transaction, error } = await supabase
           .from('transactions')
           .update({ status: 'completed' })
-          .eq('payment_id', payment_id);
+          .eq('payment_id', payment_id)
+          .select()
+          .single();
 
         if (error) {
           console.error('Error updating transaction:', error);
+        } else if (transaction) {
+          console.log(`Payment completed for transaction ${transaction.id}, creating available assignments...`);
+          
+          // Create available assignments for providers
+          try {
+            const { createAvailableAssignments } = await import('./available-assignments');
+            await createAvailableAssignments(transaction.id);
+            console.log(`Successfully created available assignments for transaction ${transaction.id}`);
+          } catch (assignmentError) {
+            console.error('Error creating available assignments:', assignmentError);
+            // Don't fail the callback if assignment creation fails
+          }
         }
         
         // Note: Platform revenue is logged when services are verified, not when payment is collected
@@ -1643,6 +2104,418 @@ export async function registerRoutes(app: Express): Promise<Server> {
       currency: 'KES',
       supported_methods: ['mpesa', 'card', 'bank']
     });
+  });
+
+  // Test endpoint to manually trigger assignment creation
+  app.post("/api/test/create-assignments", async (req, res) => {
+    try {
+      const { transaction_id } = req.body;
+      
+      if (!transaction_id) {
+        return res.status(400).json({ message: "Transaction ID is required" });
+      }
+
+      console.log(`Manually creating assignments for transaction ${transaction_id}`);
+      
+      const { createAvailableAssignments } = await import('./available-assignments');
+      await createAvailableAssignments(transaction_id);
+      
+      res.json({ 
+        success: true, 
+        message: `Successfully created assignments for transaction ${transaction_id}` 
+      });
+    } catch (error) {
+      console.error('Error in test assignment creation:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to create assignments", 
+        error: (error as Error).message 
+      });
+    }
+  });
+
+  // Test endpoint to check transaction status
+  app.get("/api/test/transaction/:transactionId", async (req, res) => {
+    try {
+      const { transactionId } = req.params;
+      
+      const { data: transaction, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('id', transactionId)
+        .single();
+
+      if (error) {
+        return res.status(404).json({ message: "Transaction not found", error: error.message });
+      }
+
+      res.json({ 
+        success: true, 
+        transaction 
+      });
+    } catch (error) {
+      console.error('Error fetching transaction:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to fetch transaction", 
+        error: (error as Error).message 
+      });
+    }
+  });
+
+  // Simple in-memory queue for webhook processing (as recommended by IntaSend)
+  const webhookQueue: Array<{ data: any; timestamp: number }> = [];
+  let isProcessingQueue = false;
+
+  const processWebhookQueue = async () => {
+    if (isProcessingQueue || webhookQueue.length === 0) return;
+    
+    isProcessingQueue = true;
+    
+    while (webhookQueue.length > 0) {
+      const webhookData = webhookQueue.shift();
+      if (webhookData) {
+        try {
+          await processWebhookData(webhookData.data);
+        } catch (error) {
+          console.error('Error processing queued webhook:', error);
+        }
+      }
+    }
+    
+    isProcessingQueue = false;
+  };
+
+  const processWebhookData = async (webhookData: any) => {
+    console.log('Processing webhook data:', JSON.stringify(webhookData, null, 2));
+    
+    // Extract webhook data according to IntaSend documentation
+    const { 
+      event_type, 
+      state, 
+      payment_id, 
+      reference, 
+      amount, 
+      currency,
+      metadata,
+      created_at,
+      updated_at
+    } = webhookData;
+
+    console.log('IntaSend webhook event details:', {
+      event_type,
+      state,
+      payment_id,
+      reference,
+      amount,
+      currency,
+      created_at,
+      updated_at
+    });
+
+    // Handle collection events based on IntaSend documentation
+    if (event_type === 'collection') {
+      console.log(`Collection event received: ${payment_id} with state: ${state}`);
+      
+      // Process different collection states
+      switch (state) {
+        case 'COMPLETED':
+          console.log(`Payment completed via webhook: ${payment_id}`);
+          
+          // Update transaction status to completed
+          const { data: transaction, error } = await supabase
+            .from('transactions')
+            .update({ 
+              status: 'completed',
+              updated_at: new Date().toISOString()
+            })
+            .eq('payment_id', payment_id)
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error updating transaction:', error);
+            throw new Error('Failed to update transaction');
+          }
+
+          if (transaction) {
+            console.log(`Payment completed for transaction ${transaction.id}, creating available assignments...`);
+            
+            // Create available assignments for providers
+            try {
+              const { createAvailableAssignments } = await import('./available-assignments');
+              await createAvailableAssignments(transaction.id);
+              console.log(`Successfully created available assignments for transaction ${transaction.id}`);
+            } catch (assignmentError) {
+              console.error('Error creating available assignments:', assignmentError);
+              throw new Error('Failed to create assignments');
+            }
+          } else {
+            console.log(`No transaction found for payment_id: ${payment_id}`);
+          }
+          break;
+
+        case 'PENDING':
+          console.log(`Payment pending: ${payment_id}`);
+          // Update transaction status to pending
+          await supabase
+            .from('transactions')
+            .update({ 
+              status: 'pending',
+              updated_at: new Date().toISOString()
+            })
+            .eq('payment_id', payment_id);
+          break;
+
+        case 'FAILED':
+          console.log(`Payment failed: ${payment_id}`);
+          // Update transaction status to failed
+          await supabase
+            .from('transactions')
+            .update({ 
+              status: 'failed',
+              updated_at: new Date().toISOString()
+            })
+            .eq('payment_id', payment_id);
+          break;
+
+        default:
+          console.log(`Unhandled collection state: ${state} for payment: ${payment_id}`);
+      }
+    } else {
+      console.log(`Webhook received but not processing: event_type=${event_type}, state=${state}`);
+    }
+  };
+
+  // IntaSend Webhook endpoint
+  app.post("/api/payment/webhook", async (req: any, res) => {
+    try {
+      console.log('IntaSend webhook received:', JSON.stringify(req.body, null, 2));
+      
+      // Verify webhook signature/challenge
+      const webhookSecret = process.env.INTASEND_WEBHOOK_SECRET || 'sk_webhook_123456789abcdef';
+      const challenge = req.headers['x-intasend-challenge'] || req.body.challenge;
+      
+      if (challenge !== webhookSecret) {
+        console.error('Invalid webhook challenge');
+        return res.status(401).json({ error: 'Invalid webhook signature' });
+      }
+
+      // Add webhook to queue for processing (as recommended by IntaSend)
+      webhookQueue.push({
+        data: req.body,
+        timestamp: Date.now()
+      });
+
+      // Process queue asynchronously
+      processWebhookQueue();
+
+      // Always return success immediately to acknowledge receipt (prevents retries)
+      res.json({ 
+        success: true, 
+        message: 'Webhook queued for processing',
+        event_type: req.body.event_type,
+        state: req.body.state,
+        payment_id: req.body.payment_id
+      });
+
+    } catch (error) {
+      console.error('Webhook processing error:', error);
+      // Return 500 to trigger IntaSend retry mechanism
+      res.status(500).json({ error: 'Webhook processing failed' });
+    }
+  });
+
+  // Manual payment verification endpoint (keeping for backup)
+  app.post("/api/payment/manual-verify", authenticateToken, async (req: any, res) => {
+    try {
+      const { payment_id } = req.body;
+
+      if (!payment_id) {
+        return res.status(400).json({ message: "Payment ID is required" });
+      }
+
+      console.log(`Manually verifying payment: ${payment_id}`);
+
+      // Verify payment with IntaSend
+      const verification = await verifyPayment(payment_id);
+
+      if (!verification.success) {
+        return res.status(400).json({ message: verification.error });
+      }
+
+      if (verification.status === 'completed') {
+        // Update transaction status to completed
+        const { data: transaction, error } = await supabase
+          .from('transactions')
+          .update({ status: 'completed' })
+          .eq('payment_id', payment_id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error updating transaction:', error);
+          return res.status(500).json({ message: "Failed to update transaction" });
+        }
+
+        if (transaction) {
+          console.log(`Payment completed for transaction ${transaction.id}, creating available assignments...`);
+          
+          // Create available assignments for providers
+          try {
+            const { createAvailableAssignments } = await import('./available-assignments');
+            await createAvailableAssignments(transaction.id);
+            console.log(`Successfully created available assignments for transaction ${transaction.id}`);
+          } catch (assignmentError) {
+            console.error('Error creating available assignments:', assignmentError);
+            return res.status(500).json({ message: "Failed to create assignments" });
+          }
+        }
+
+        res.json({
+          success: true,
+          status: verification.status,
+          message: "Payment verified and assignments created successfully"
+        });
+      } else {
+        res.json({
+          success: true,
+          status: verification.status,
+          message: "Payment not yet completed"
+        });
+      }
+
+    } catch (error) {
+      console.error('Manual payment verification error:', error);
+      res.status(500).json({ message: "Failed to verify payment", error: (error as Error).message });
+    }
+  });
+
+  // Payment success page
+  app.get("/payment/success", (req, res) => {
+    // Add cache control headers to prevent caching
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    const { tracking_id, signature, checkout_id } = req.query;
+    
+    // Send HTML response for payment success
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Payment Successful - Social Marketplace</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .success-container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 90%;
+          }
+          .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #10b981;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 40px;
+            color: white;
+          }
+          h1 {
+            color: #1f2937;
+            margin-bottom: 10px;
+            font-size: 28px;
+          }
+          p {
+            color: #6b7280;
+            margin-bottom: 30px;
+            line-height: 1.6;
+          }
+          .btn {
+            background: #10b981;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 10px;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 600;
+            transition: all 0.3s ease;
+          }
+          .btn:hover {
+            background: #059669;
+            transform: translateY(-2px);
+          }
+          .details {
+            background: #f9fafb;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+          }
+          .details h3 {
+            margin: 0 0 10px 0;
+            color: #374151;
+            font-size: 16px;
+          }
+          .details p {
+            margin: 5px 0;
+            color: #6b7280;
+            font-size: 14px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="success-container">
+          <div class="success-icon">✓</div>
+          <h1>Payment Successful!</h1>
+          <p>Your order has been placed successfully and will be processed shortly. You will receive an email confirmation shortly.</p>
+          
+          <div class="details">
+            <h3>Order Details:</h3>
+            <p><strong>Tracking ID:</strong> ${tracking_id || 'N/A'}</p>
+            <p><strong>Checkout ID:</strong> ${checkout_id || 'N/A'}</p>
+            <p><strong>Status:</strong> Payment Completed</p>
+          </div>
+          
+          <a href="/buyer" class="btn">Go to Dashboard</a>
+        </div>
+        
+        <script>
+          // Auto-redirect to dashboard after 5 seconds
+          setTimeout(() => {
+            window.location.href = '/buyer';
+          }, 5000);
+          
+          // Force reload to ensure we have the latest version
+          if (window.performance && window.performance.navigation.type === window.performance.navigation.TYPE_BACK_FORWARD) {
+            window.location.reload();
+          }
+
+
+        </script>
+      </body>
+      </html>
+    `);
   });
 
   // Admin routes
@@ -2001,6 +2874,513 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Initialize email templates on server start
   initializeEmailTemplates().catch(console.error);
+
+  // Update user role
+  app.patch("/api/user/role", authenticateToken, async (req: any, res) => {
+    try {
+      const { role } = req.body;
+      
+      if (!role || !['buyer', 'provider', 'admin'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role. Must be 'buyer', 'provider', or 'admin'" });
+      }
+
+      // Update user role in database
+      const { error } = await supabase
+        .from('users')
+        .update({ role: role })
+        .eq('id', req.user.id);
+
+      if (error) throw error;
+
+      res.json({ message: 'Role updated successfully', role });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update role", error });
+    }
+  });
+
+  // ===== AVAILABLE ASSIGNMENTS SYSTEM =====
+
+  // Get available assignments for providers (filtered by their selected services)
+  app.get("/api/provider/available-assignments", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'provider') {
+        return res.status(403).json({ message: "Provider access required" });
+      }
+
+      const { getAvailableAssignmentsForProvider } = await import('./available-assignments');
+      const assignments = await getAvailableAssignmentsForProvider(req.user.id);
+      res.json(assignments);
+
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to get available assignments", error: error.message });
+    }
+  });
+
+  // Claim an available assignment
+  app.post("/api/provider/claim-assignment/:assignmentId", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'provider') {
+        return res.status(403).json({ message: "Provider access required" });
+      }
+
+      const { assignmentId } = req.params;
+      const { claimAssignment } = await import('./available-assignments');
+      
+      const result = await claimAssignment(parseInt(assignmentId), req.user.id);
+      
+      if (result.success) {
+        res.json({ 
+          message: "Assignment claimed successfully", 
+          assignment: result.assignment
+        });
+      } else {
+        res.status(400).json({ message: result.error });
+      }
+
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to claim assignment", error: error.message });
+    }
+  });
+
+  // Upload proof screenshot
+  app.post("/api/upload-proof", authenticateToken, upload.single('file'), async (req: any, res) => {
+    try {
+      const { uploadProofScreenshot } = await import('./file-upload');
+      await uploadProofScreenshot(req, res);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upload file", error });
+    }
+  });
+
+  // Submit proof for an assignment
+  app.post("/api/provider/submit-proof/:assignmentId", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'provider') {
+        return res.status(403).json({ message: "Provider access required" });
+      }
+
+      const { assignmentId } = req.params;
+      const { screenshot_url, submission_notes } = req.body;
+
+      if (!screenshot_url) {
+        return res.status(400).json({ message: "Screenshot URL is required" });
+      }
+
+      // Get the action assignment
+      const { data: actionAssignment, error: fetchError } = await supabase
+        .from('action_assignments')
+        .select(`
+          *,
+          transactions!inner(buyer_id)
+        `)
+        .eq('id', assignmentId)
+        .eq('provider_id', req.user.id)
+        .eq('status', 'assigned')
+        .single();
+
+      if (fetchError || !actionAssignment) {
+        return res.status(404).json({ message: "Assignment not found or not assigned to you" });
+      }
+
+      // Create submission record
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 48); // 48 hours for buyer verification
+
+      const { data: submission, error: submissionError } = await supabase
+        .from('submissions')
+        .insert({
+          assignment_id: parseInt(assignmentId),
+          provider_id: req.user.id,
+          buyer_id: actionAssignment.transactions.buyer_id,
+          screenshot_url,
+          submission_notes,
+          expires_at: expiresAt.toISOString()
+        })
+        .select()
+        .single();
+
+      if (submissionError) throw submissionError;
+
+      // Update action assignment status
+      const { error: updateError } = await supabase
+        .from('action_assignments')
+        .update({
+          status: 'submitted',
+          submitted_at: new Date().toISOString(),
+          proof_url: screenshot_url
+        })
+        .eq('id', assignmentId);
+
+      if (updateError) throw updateError;
+
+      res.json({ 
+        message: "Proof submitted successfully", 
+        submission,
+        expiresAt: expiresAt.toISOString()
+      });
+
+    } catch (error) {
+      res.status(500).json({ message: "Failed to submit proof", error: (error as Error).message });
+    }
+  });
+
+  // Buyer: Review submission
+  app.post("/api/buyer/review-submission/:submissionId", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'buyer') {
+        return res.status(403).json({ message: "Buyer access required" });
+      }
+
+      const { submissionId } = req.params;
+      const { status, review_notes } = req.body;
+
+      if (!status || !['approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ message: "Status must be 'approved' or 'rejected'" });
+      }
+
+      // Get submission and verify it belongs to this buyer
+      const { data: submission, error: fetchError } = await supabase
+        .from('submissions')
+        .select(`
+          *,
+          action_assignments!inner(transaction_id, service_id, platform, action_type)
+        `)
+        .eq('id', submissionId)
+        .eq('buyer_id', req.user.id)
+        .eq('status', 'pending')
+        .single();
+
+      if (fetchError || !submission) {
+        return res.status(404).json({ message: "Submission not found or already reviewed" });
+      }
+
+      // Update submission
+      const { data: updatedSubmission, error: updateError } = await supabase
+        .from('submissions')
+        .update({
+          status: status,
+          buyer_reviewed_at: new Date().toISOString(),
+          buyer_review_notes: review_notes
+        })
+        .eq('id', submissionId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // Update action assignment status
+      const { error: actionUpdateError } = await supabase
+        .from('action_assignments')
+        .update({
+          status: status === 'approved' ? 'completed' : 'rejected',
+          verification_method: 'manual',
+          verification_reason: review_notes,
+          verified_at: new Date().toISOString()
+        })
+        .eq('id', submission.assignment_id);
+
+      if (actionUpdateError) throw actionUpdateError;
+
+      // If approved, credit the provider
+      if (status === 'approved') {
+        // Get service details to calculate earnings
+        const { data: service } = await supabase
+          .from('services')
+          .select('price')
+          .eq('id', submission.action_assignments.service_id)
+          .single();
+
+        if (service) {
+          const earnings = parseFloat(service.price) * 0.5; // Provider gets 50% (5 KES out of 10 KES)
+
+          // Get current balance first
+          const { data: currentUser } = await supabase
+            .from('users')
+            .select('balance')
+            .eq('id', submission.provider_id)
+            .single();
+
+          const currentBalance = currentUser?.balance || 0;
+          const newBalance = currentBalance + earnings;
+
+          // Update provider balance
+          const { error: balanceError } = await supabase
+            .from('users')
+            .update({ 
+              balance: newBalance
+            })
+            .eq('id', submission.provider_id);
+
+          if (balanceError) throw balanceError;
+
+          // Log credit transaction
+          await supabase
+            .from('credit_transactions')
+            .insert({
+              provider_id: submission.provider_id,
+              assignment_id: submission.assignment_id,
+              amount: earnings,
+              balance_before: currentBalance,
+              balance_after: newBalance,
+              reason: "Buyer approved proof"
+            });
+        }
+      }
+
+      res.json({ 
+        message: `Submission ${status} successfully`, 
+        submission: updatedSubmission 
+      });
+
+    } catch (error) {
+      res.status(500).json({ message: "Failed to review submission", error: (error as Error).message });
+    }
+  });
+
+  // Get provider's submissions
+  app.get("/api/provider/submissions", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'provider') {
+        return res.status(403).json({ message: "Provider access required" });
+      }
+
+      const { data: submissions, error } = await supabase
+        .from('submissions')
+        .select(`
+          *,
+          action_assignments!inner(
+            action_type,
+            platform,
+            target_url,
+            comment_text,
+            transactions!inner(
+              users!transactions_buyer_id_fkey(name, email)
+            )
+          )
+        `)
+        .eq('provider_id', req.user.id)
+        .order('submitted_at', { ascending: false });
+
+      if (error) throw error;
+
+      res.json(submissions || []);
+
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get submissions", error: (error as Error).message });
+    }
+  });
+
+  // Get buyer's pending submissions to review
+  app.get("/api/buyer/pending-submissions", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'buyer') {
+        return res.status(403).json({ message: "Buyer access required" });
+      }
+
+      const { data: submissions, error } = await supabase
+        .from('submissions')
+        .select(`
+          *,
+          action_assignments!inner(
+            action_type,
+            platform,
+            target_url,
+            comment_text,
+            service_id
+          ),
+          users!submissions_provider_id_fkey(name, email)
+        `)
+        .eq('buyer_id', req.user.id)
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
+        .order('submitted_at', { ascending: false });
+
+      if (error) throw error;
+
+      res.json(submissions || []);
+
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get pending submissions", error: (error as Error).message });
+    }
+  });
+
+  // ===== END AVAILABLE ASSIGNMENTS SYSTEM =====
+
+  // Test endpoint to manually trigger webhook processing
+  app.post("/api/test/webhook", async (req, res) => {
+    try {
+      const { payment_id, state, event_type } = req.body;
+      
+      if (!payment_id || !state) {
+        return res.status(400).json({ message: "Payment ID and state are required" });
+      }
+
+      console.log(`Manually triggering webhook for payment: ${payment_id} with state: ${state}`);
+      
+      const webhookData = {
+        event_type: event_type || 'collection',
+        state: state,
+        payment_id: payment_id,
+        reference: `test-${payment_id}`,
+        amount: 1000,
+        currency: 'KES',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      await processWebhookData(webhookData);
+      
+      res.json({ 
+        success: true, 
+        message: `Successfully processed webhook for payment ${payment_id}` 
+      });
+    } catch (error) {
+      console.error('Error in test webhook processing:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to process webhook", 
+        error: (error as Error).message 
+      });
+    }
+  });
+
+  // Get completed submissions for buyer verification
+  app.get("/api/buyer/submissions", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'buyer') {
+        return res.status(403).json({ message: "Buyer access required" });
+      }
+
+      console.log('Getting buyer submissions for user:', req.user.id);
+      
+      // First get all transactions for this buyer
+      const { data: transactions, error: transactionsError } = await supabase
+        .from('transactions')
+        .select('id')
+        .eq('buyer_id', req.user.id);
+
+      console.log('Buyer transactions:', transactions);
+
+      if (transactionsError) {
+        throw transactionsError;
+      }
+
+      if (!transactions || transactions.length === 0) {
+        return res.json([]);
+      }
+
+      const transactionIds = transactions.map(t => t.id);
+
+      // Get action assignments that have been completed by providers
+      const { data: submissions, error } = await supabase
+        .from('action_assignments')
+        .select(`
+          *,
+          users!action_assignments_provider_id_fkey(name, email)
+        `)
+        .in('transaction_id', transactionIds)
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: false });
+
+      console.log('Buyer submissions query result:', { submissions, error });
+
+      if (error) {
+        throw error;
+      }
+
+      const buyerSubmissions = submissions?.map(submission => ({
+        id: submission.id,
+        platform: submission.platform,
+        actionType: submission.action_type,
+        status: submission.status,
+        targetUrl: submission.target_url,
+        commentText: submission.comment_text,
+        proofUrl: submission.proof_url,
+        createdAt: submission.created_at,
+        completedAt: submission.completed_at,
+        providerId: submission.provider_id,
+        providerName: submission.users?.name || 'Provider',
+        providerEmail: submission.users?.email || 'provider@example.com',
+        verificationScreenshots: submission.proof_url ? [
+          {
+            url: submission.proof_url,
+            description: 'Verification screenshot',
+            uploadedAt: submission.submitted_at
+          }
+        ] : []
+      })) || [];
+
+      res.json(buyerSubmissions);
+
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get buyer submissions", error: (error as Error).message });
+    }
+  });
+
+  // Get all assignments for buyer
+  app.get("/api/buyer/assignments", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'buyer') {
+        return res.status(403).json({ message: "Buyer access required" });
+      }
+
+      // Get buyer assignments through transactions
+      console.log('Getting buyer assignments for user:', req.user.id);
+      
+      // First get all transactions for this buyer
+      const { data: transactions, error: transactionsError } = await supabase
+        .from('transactions')
+        .select('id')
+        .eq('buyer_id', req.user.id);
+
+      console.log('Buyer transactions:', transactions);
+
+      if (transactionsError) {
+        throw transactionsError;
+      }
+
+      if (!transactions || transactions.length === 0) {
+        return res.json([]);
+      }
+
+      const transactionIds = transactions.map(t => t.id);
+
+      // Then get available assignments for these transactions
+      const { data: assignments, error } = await supabase
+        .from('available_assignments')
+        .select('*')
+        .in('transaction_id', transactionIds)
+        .order('created_at', { ascending: false });
+
+      console.log('Buyer assignments query result:', { assignments, error });
+
+      if (error) {
+        throw error;
+      }
+
+      const buyerAssignments = assignments?.map(assignment => ({
+        id: assignment.id,
+        platform: assignment.platform,
+        actionType: assignment.action_type,
+        status: assignment.status,
+        targetUrl: assignment.target_url,
+        commentText: assignment.comment_text,
+        proofUrl: null, // available_assignments don't have proof_url
+        createdAt: assignment.created_at,
+        assignedAt: assignment.claimed_at || assignment.created_at, // Use claimed_at if available, otherwise created_at
+        completedAt: assignment.claimed_at, // Use claimed_at as completion time
+        providerId: assignment.claimed_by || null, // Use claimed_by as provider_id, null if not claimed
+        providerName: assignment.claimed_by ? 'Provider' : null, // Placeholder since we don't have user info
+        providerEmail: assignment.claimed_by ? 'provider@example.com' : null, // Placeholder
+        verificationScreenshots: [] // available_assignments don't have verification screenshots yet
+      })) || [];
+
+      res.json(buyerAssignments);
+
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get buyer assignments", error: (error as Error).message });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
